@@ -1,0 +1,6 @@
+{
+  "name": "StudioAdsPro CRM",
+  "description": "Full-Stack CRM application for StudioAdsPro (SAP) with role-based access control, lead management, project tracking, and team communications.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

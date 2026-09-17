@@ -1,0 +1,174 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "StudioAdsPro CRM user profile and credentials record",
+      "type": "object",
+      "properties": {
+        "email": { "type": "string", "maxLength": 100 },
+        "name": { "type": "string", "maxLength": 100 },
+        "role": { "type": "string", "enum": ["ADMIN", "TEAM_LEAD", "EMPLOYEE"] },
+        "profession": { "type": "string", "enum": ["MOBILE_APP", "WEBSITE", "MARKETING", "SOCIAL_MEDIA_HANDLING", "VIDEO_SHOOT_EDIT"] },
+        "teamId": { "type": "string", "maxLength": 100 },
+        "employmentType": { "type": "string", "enum": ["FULL_TIME", "FREELANCER"] },
+        "reportsTo": { "type": "string", "maxLength": 100 },
+        "createdBy": { "type": "string", "maxLength": 100 },
+        "createdAt": { "type": "string" },
+        "status": { "type": "string", "enum": ["ACTIVE", "INACTIVE", "ON_LEAVE"] },
+        "phone": { "type": "string", "maxLength": 30 },
+        "avatar": { "type": "string", "maxLength": 500 }
+      },
+      "required": ["email", "name", "role", "profession", "status"]
+    },
+    "Team": {
+      "title": "Team",
+      "description": "Team unit mapped to specific digital agency profession",
+      "type": "object",
+      "properties": {
+        "teamName": { "type": "string", "maxLength": 100 },
+        "profession": { "type": "string", "enum": ["MOBILE_APP", "WEBSITE", "MARKETING", "SOCIAL_MEDIA_HANDLING", "VIDEO_SHOOT_EDIT"] },
+        "teamLeadId": { "type": "string", "maxLength": 100 },
+        "members": { "type": "array" },
+        "createdAt": { "type": "string" },
+        "description": { "type": "string", "maxLength": 500 },
+        "status": { "type": "string", "enum": ["ACTIVE", "INACTIVE"] }
+      },
+      "required": ["teamName", "profession", "teamLeadId", "status"]
+    },
+    "Lead": {
+      "title": "Lead",
+      "description": "Prospective client lead and service requirements",
+      "type": "object",
+      "properties": {
+        "clientName": { "type": "string", "maxLength": 120 },
+        "email": { "type": "string", "maxLength": 100 },
+        "phone": { "type": "string", "maxLength": 30 },
+        "budget": { "type": "number" },
+        "date": { "type": "string" },
+        "servicesRequired": { "type": "array" },
+        "assignedTo": { "type": "array" },
+        "status": { "type": "string", "enum": ["NEW", "QUALIFIED", "IN_PROGRESS", "COMPLETED", "CLOSED"] },
+        "notes": { "type": "string", "maxLength": 1000 },
+        "createdAt": { "type": "string" },
+        "createdBy": { "type": "string", "maxLength": 100 },
+        "lastModified": { "type": "string" },
+        "sourceChannel": { "type": "string", "maxLength": 80 },
+        "assignedTeamId": { "type": "string", "maxLength": 100 },
+        "assignedTeamLeadId": { "type": "string", "maxLength": 100 },
+        "assignedEmployeeIds": { "type": "array" },
+        "delegatedBy": { "type": "string", "maxLength": 100 },
+        "delegatedAt": { "type": "string" },
+        "tlNotes": { "type": "string", "maxLength": 1000 }
+      },
+      "required": ["clientName", "budget", "servicesRequired", "status"]
+    },
+    "Project": {
+      "title": "Project",
+      "description": "Assigned client project tracking deliverables and progress",
+      "type": "object",
+      "properties": {
+        "projectName": { "type": "string", "maxLength": 150 },
+        "leadId": { "type": "string", "maxLength": 100 },
+        "assignedTeamId": { "type": "string", "maxLength": 100 },
+        "assignedEmployees": { "type": "array" },
+        "profession": { "type": "string", "enum": ["MOBILE_APP", "WEBSITE", "MARKETING", "SOCIAL_MEDIA_HANDLING", "VIDEO_SHOOT_EDIT"] },
+        "status": { "type": "string", "enum": ["NOT_STARTED", "IN_PROGRESS", "REVIEW", "COMPLETED", "ON_HOLD"] },
+        "startDate": { "type": "string" },
+        "dueDate": { "type": "string" },
+        "progress": { "type": "number" },
+        "createdAt": { "type": "string" },
+        "deliverables": { "type": "array" }
+      },
+      "required": ["projectName", "status", "progress"]
+    },
+    "Discussion": {
+      "title": "Discussion",
+      "description": "Private direct or group messaging channel",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string", "maxLength": 120 },
+        "type": { "type": "string", "enum": ["PRIVATE", "GROUP"] },
+        "participants": { "type": "array" },
+        "createdBy": { "type": "string", "maxLength": 100 },
+        "createdAt": { "type": "string" },
+        "isActive": { "type": "boolean" },
+        "lastMessageAt": { "type": "string" }
+      },
+      "required": ["title", "type", "participants", "isActive"]
+    },
+    "Message": {
+      "title": "Message",
+      "description": "Real-time communication message",
+      "type": "object",
+      "properties": {
+        "senderId": { "type": "string", "maxLength": 100 },
+        "senderName": { "type": "string", "maxLength": 100 },
+        "message": { "type": "string", "maxLength": 3000 },
+        "timestamp": { "type": "string" },
+        "edited": { "type": "boolean" },
+        "editedAt": { "type": "string" }
+      },
+      "required": ["senderId", "message"]
+    },
+    "Invitation": {
+      "title": "Invitation",
+      "description": "Group chat access invitation",
+      "type": "object",
+      "properties": {
+        "discussionId": { "type": "string", "maxLength": 100 },
+        "invitedUserId": { "type": "string", "maxLength": 100 },
+        "invitedBy": { "type": "string", "maxLength": 100 },
+        "status": { "type": "string", "enum": ["PENDING", "ACCEPTED", "REJECTED"] },
+        "createdAt": { "type": "string" },
+        "expiresAt": { "type": "string" }
+      },
+      "required": ["discussionId", "invitedUserId", "invitedBy", "status"]
+    },
+    "AuditLog": {
+      "title": "AuditLog",
+      "description": "Immutable security and action audit trail log",
+      "type": "object",
+      "properties": {
+        "action": { "type": "string", "maxLength": 100 },
+        "performedBy": { "type": "string", "maxLength": 100 },
+        "details": { "type": "string", "maxLength": 1000 },
+        "timestamp": { "type": "string" }
+      },
+      "required": ["action", "performedBy", "details"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": { "$ref": "#/entities/User" },
+      "description": "Collection of system users and profiles"
+    },
+    "/teams/{teamId}": {
+      "schema": { "$ref": "#/entities/Team" },
+      "description": "Collection of profession-based teams"
+    },
+    "/leads/{leadId}": {
+      "schema": { "$ref": "#/entities/Lead" },
+      "description": "Collection of client leads"
+    },
+    "/projects/{projectId}": {
+      "schema": { "$ref": "#/entities/Project" },
+      "description": "Collection of agency projects"
+    },
+    "/discussions/{discussionId}": {
+      "schema": { "$ref": "#/entities/Discussion" },
+      "description": "Private and group discussions"
+    },
+    "/discussions/{discussionId}/messages/{messageId}": {
+      "schema": { "$ref": "#/entities/Message" },
+      "description": "Messages belonging to a discussion"
+    },
+    "/invitations/{invitationId}": {
+      "schema": { "$ref": "#/entities/Invitation" },
+      "description": "Invitations for group chat participation"
+    },
+    "/audits/{auditId}": {
+      "schema": { "$ref": "#/entities/AuditLog" },
+      "description": "Admin actions audit logging"
+    }
+  }
+}
