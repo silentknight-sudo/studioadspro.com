@@ -12,7 +12,6 @@ import {
   Check,
   Eye,
   RotateCcw,
-  Building2,
 } from 'lucide-react';
 import { UserRole, UserStatus } from '../../types';
 
@@ -98,13 +97,22 @@ export const Navbar: React.FC<NavbarProps> = ({
     <header className="sticky top-0 z-30 h-16 bg-slate-900/80 backdrop-blur-md border-b border-slate-800 flex items-center justify-between px-4 lg:px-8">
       {/* Brand & Search */}
       <div className="flex items-center gap-6 flex-1 max-w-xl">
-        <div className="flex items-center gap-2.5 shrink-0">
-          <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-blue-600 to-indigo-500 flex items-center justify-center text-white shadow-md shadow-blue-600/20">
-            <Building2 className="w-5 h-5" />
+        <div className="flex items-center gap-3 shrink-0">
+          <div className="w-9 h-9 rounded-xl overflow-hidden bg-slate-950 border border-slate-700/60 flex items-center justify-center shadow-md shadow-blue-900/20 p-1">
+            <img
+              src="/studioadspro-logo.png"
+              alt="StudioAdsPro Logo"
+              className="w-full h-full object-contain"
+              referrerPolicy="no-referrer"
+              onError={(e) => {
+                // Fallback to online URL if needed
+                (e.currentTarget as HTMLImageElement).src = 'https://www.studioadspro.com/favicon-512x512.png';
+              }}
+            />
           </div>
           <div>
             <span className="font-bold text-white tracking-tight text-base">StudioAdsPro</span>
-            <span className="hidden sm:inline-block ml-2 text-[10px] font-semibold uppercase tracking-wider text-slate-400 bg-slate-800 px-1.5 py-0.5 rounded border border-slate-700">
+            <span className="hidden sm:inline-block ml-2 text-[10px] font-semibold uppercase tracking-wider text-blue-400 bg-blue-950/80 px-1.5 py-0.5 rounded border border-blue-800/40">
               CRM
             </span>
           </div>

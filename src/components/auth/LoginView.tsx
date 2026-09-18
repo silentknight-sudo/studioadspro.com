@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
 import {
-  Building2,
   Lock,
   User,
   ArrowRight,
@@ -50,9 +49,17 @@ export const LoginView: React.FC = () => {
 
       <div className="sm:mx-auto sm:w-full sm:max-w-md relative z-10">
         {/* Brand Header */}
-        <div className="flex items-center justify-center gap-3 mb-2">
-          <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-blue-600 to-indigo-500 flex items-center justify-center text-white shadow-xl shadow-blue-500/25">
-            <Building2 className="w-6 h-6" />
+        <div className="flex items-center justify-center gap-3.5 mb-2">
+          <div className="w-14 h-14 rounded-2xl bg-slate-950 border border-slate-700/80 flex items-center justify-center shadow-xl shadow-blue-500/20 p-1.5 overflow-hidden">
+            <img
+              src="/studioadspro-logo.png"
+              alt="StudioAdsPro Logo"
+              className="w-full h-full object-contain"
+              referrerPolicy="no-referrer"
+              onError={(e) => {
+                (e.currentTarget as HTMLImageElement).src = 'https://www.studioadspro.com/favicon-512x512.png';
+              }}
+            />
           </div>
           <div>
             <h1 className="text-2xl font-bold tracking-tight text-white">StudioAdsPro</h1>

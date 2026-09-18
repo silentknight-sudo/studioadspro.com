@@ -320,10 +320,25 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, onTabChange, counts
 
       {/* Footer info */}
       <div className="p-4 border-t border-slate-800 text-xs text-slate-400">
-        <div className="font-semibold text-slate-300">StudioAdsPro CRM</div>
-        <div className="text-[10px] text-emerald-400 flex items-center gap-1 mt-0.5">
-          <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 inline-block animate-pulse" />
-          Live Firestore Sync
+        <div className="flex items-center gap-2.5">
+          <div className="w-6 h-6 rounded-lg bg-slate-950 border border-slate-800 flex items-center justify-center p-0.5 overflow-hidden shrink-0 shadow-sm">
+            <img
+              src="/studioadspro-logo.png"
+              alt="SAP"
+              className="w-full h-full object-contain"
+              referrerPolicy="no-referrer"
+              onError={(e) => {
+                (e.currentTarget as HTMLImageElement).src = 'https://www.studioadspro.com/favicon-512x512.png';
+              }}
+            />
+          </div>
+          <div>
+            <div className="font-semibold text-slate-200 leading-tight">StudioAdsPro CRM</div>
+            <div className="text-[10px] text-emerald-400 flex items-center gap-1 mt-0.5">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 inline-block animate-pulse" />
+              Live Firestore Sync
+            </div>
+          </div>
         </div>
       </div>
     </aside>
