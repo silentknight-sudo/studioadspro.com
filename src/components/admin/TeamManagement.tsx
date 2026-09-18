@@ -59,6 +59,15 @@ export const TeamManagement: React.FC<TeamManagementProps> = ({
 
   const [modalOpen, setModalOpen] = useState(initialCreateOpen);
   const [editingTeam, setEditingTeam] = useState<Team | null>(null);
+  const [teamToDelete, setTeamToDelete] = useState<Team | null>(null);
+
+  React.useEffect(() => {
+    if (initialCreateOpen) {
+      resetForm();
+      setModalOpen(true);
+      onCloseCreateModal?.();
+    }
+  }, [initialCreateOpen]);
 
   // Form state
   const [teamName, setTeamName] = useState('');
@@ -152,16 +161,23 @@ export const TeamManagement: React.FC<TeamManagementProps> = ({
     }
   };
 
-  const handleDeleteTeam = async (team: Team) => {
-    if (!window.confirm(`Delete team "${team.teamName}"?`)) return;
+  const confirmDeleteTeam = async () => {
+    if (!teamToDelete) return;
+    const target = teamToDelete;
+    setTeamToDelete(null);
+
     try {
-      await deleteDoc(doc(db, 'teams', team.id));
-      await logAuditEvent('TEAM_DELETED', profile?.email || 'Admin', `Deleted team "${team.teamName}"`);
-      success(`Team "${team.teamName}" deleted.`);
+      await deleteDoc(doc(db, 'teams', target.id));
+      await logAuditEvent('TEAM_DELETED', profile?.email || 'Admin', `Deleted team "${target.teamName}"`);
+      success(`Team "${target.teamName}" deleted.`);
     } catch (err) {
-      handleFirestoreError(err, OperationType.DELETE, `teams/${team.id}`);
+      handleFirestoreError(err, OperationType.DELETE, `teams/${target.id}`);
       error('Failed to delete team.');
     }
+  };
+
+  const handleDeleteTeam = (team: Team) => {
+    setTeamToDelete(team);
   };
 
   return (
@@ -458,6 +474,37 @@ export const TeamManagement: React.FC<TeamManagementProps> = ({
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Team Confirmation Modal */}
+      {teamToDelete && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm">
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-sm shadow-2xl p-5 space-y-4">
+            <div className="flex items-center gap-3 text-rose-400">
+              <Trash2 className="w-5 h-5" />
+              <h3 className="text-sm font-bold text-white">Delete Team</h3>
+            </div>
+            <p className="text-xs text-slate-300 leading-relaxed">
+              Are you sure you want to delete squad <strong className="text-white">"{teamToDelete.teamName}"</strong>? This will detach team members from this unit.
+            </p>
+            <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-800">
+              <button
+                type="button"
+                onClick={() => setTeamToDelete(null)}
+                className="px-3.5 py-1.5 rounded-xl text-xs font-semibold text-slate-400 hover:text-white"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={confirmDeleteTeam}
+                className="px-4 py-1.5 rounded-xl text-xs font-semibold text-white bg-rose-600 hover:bg-rose-500 shadow-md cursor-pointer"
+              >
+                Delete Team
+              </button>
+            </div>
           </div>
         </div>
       )}

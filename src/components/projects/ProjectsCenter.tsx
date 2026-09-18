@@ -72,8 +72,17 @@ export const ProjectsCenter: React.FC<ProjectsCenterProps> = ({
   // Modal states
   const [modalOpen, setModalOpen] = useState(initialCreateOpen);
   const [editingProject, setEditingProject] = useState<Project | null>(null);
+  const [projectToDelete, setProjectToDelete] = useState<Project | null>(null);
   const [deliverablesModalProject, setDeliverablesModalProject] = useState<Project | null>(null);
   const [newDeliverableInput, setNewDeliverableInput] = useState('');
+
+  React.useEffect(() => {
+    if (initialCreateOpen) {
+      resetForm();
+      setModalOpen(true);
+      onCloseCreateModal?.();
+    }
+  }, [initialCreateOpen]);
 
   // Form states
   const [projectName, setProjectName] = useState('');
@@ -176,16 +185,23 @@ export const ProjectsCenter: React.FC<ProjectsCenterProps> = ({
     }
   };
 
-  const handleDeleteProject = async (p: Project) => {
-    if (!window.confirm(`Delete project "${p.projectName}"?`)) return;
+  const confirmDeleteProject = async () => {
+    if (!projectToDelete) return;
+    const target = projectToDelete;
+    setProjectToDelete(null);
+
     try {
-      await deleteDoc(doc(db, 'projects', p.id));
-      await logAuditEvent('PROJECT_DELETED', profile?.email || 'Admin', `Deleted project "${p.projectName}"`);
-      success(`Project "${p.projectName}" deleted.`);
+      await deleteDoc(doc(db, 'projects', target.id));
+      await logAuditEvent('PROJECT_DELETED', profile?.email || 'Admin', `Deleted project "${target.projectName}"`);
+      success(`Project "${target.projectName}" deleted.`);
     } catch (err) {
-      handleFirestoreError(err, OperationType.DELETE, `projects/${p.id}`);
+      handleFirestoreError(err, OperationType.DELETE, `projects/${target.id}`);
       error('Failed to delete project.');
     }
+  };
+
+  const handleDeleteProject = (p: Project) => {
+    setProjectToDelete(p);
   };
 
   const handleQuickStatusChange = async (p: Project, newStatus: ProjectStatus) => {
@@ -730,6 +746,37 @@ export const ProjectsCenter: React.FC<ProjectsCenterProps> = ({
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Project Confirmation Modal */}
+      {projectToDelete && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm">
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-sm shadow-2xl p-5 space-y-4">
+            <div className="flex items-center gap-3 text-rose-400">
+              <Trash2 className="w-5 h-5" />
+              <h3 className="text-sm font-bold text-white">Delete Project</h3>
+            </div>
+            <p className="text-xs text-slate-300 leading-relaxed">
+              Are you sure you want to delete project <strong className="text-white">"{projectToDelete.projectName}"</strong>? This will remove all associated task records.
+            </p>
+            <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-800">
+              <button
+                type="button"
+                onClick={() => setProjectToDelete(null)}
+                className="px-3.5 py-1.5 rounded-xl text-xs font-semibold text-slate-400 hover:text-white"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={confirmDeleteProject}
+                className="px-4 py-1.5 rounded-xl text-xs font-semibold text-white bg-rose-600 hover:bg-rose-500 shadow-md cursor-pointer"
+              >
+                Delete Project
+              </button>
+            </div>
           </div>
         </div>
       )}

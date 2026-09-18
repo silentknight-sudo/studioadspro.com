@@ -102,9 +102,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   });
 
-  // Seed default data if database is fresh
+  // Production mode: automatic sample seeding disabled per user instruction
   useEffect(() => {
-    seedInitialDatabaseIfEmpty().catch((e) => console.warn('Database seed skipped:', e));
+    // Zero sample data auto-population
   }, []);
 
   const syncUserProfile = async (firebaseUser: FirebaseUser) => {

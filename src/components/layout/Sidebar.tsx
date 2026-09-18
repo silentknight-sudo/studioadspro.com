@@ -6,36 +6,35 @@ import {
   Briefcase,
   Layers,
   MessageSquare,
-  BarChart3,
   ShieldAlert,
-  UserCheck,
-  CheckCircle2,
   FolderKanban,
   FileSpreadsheet,
 } from 'lucide-react';
 
 export type NavTab =
-  | 'admin_dashboard'
+  | 'dashboard'
   | 'leads'
-  | 'users'
   | 'teams'
+  | 'users'
   | 'projects'
-  | 'reports'
-  | 'audit'
-  | 'teamlead_dashboard'
-  | 'my_team'
-  | 'team_projects'
-  | 'employee_dashboard'
-  | 'employee_projects'
-  | 'employee_profile'
-  | 'discussions';
+  | 'teamlead'
+  | 'employee'
+  | 'discussions'
+  | 'audit';
 
 interface SidebarProps {
   activeTab: NavTab;
   onTabChange: (tab: NavTab) => void;
+  counts?: {
+    leads: number;
+    projects: number;
+    teams: number;
+    users: number;
+    audits: number;
+  };
 }
 
-export const Sidebar: React.FC<SidebarProps> = ({ activeTab, onTabChange }) => {
+export const Sidebar: React.FC<SidebarProps> = ({ activeTab, onTabChange, counts }) => {
   const { role } = useAuth();
 
   return (
@@ -50,93 +49,118 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, onTabChange }) => {
             <nav className="space-y-1">
               <button
                 type="button"
-                onClick={() => onTabChange('admin_dashboard')}
-                className={`w-full flex items-center gap-3 px-3 py-2 rounded-xl text-xs font-semibold transition-all ${
-                  activeTab === 'admin_dashboard'
+                id="sidebar-nav-dashboard"
+                onClick={() => onTabChange('dashboard')}
+                className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
+                  activeTab === 'dashboard'
                     ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/30'
                     : 'text-slate-300 hover:text-white hover:bg-slate-800/70'
                 }`}
               >
-                <LayoutDashboard className="w-4 h-4" />
-                Executive Dashboard
+                <div className="flex items-center gap-3">
+                  <LayoutDashboard className="w-4 h-4" />
+                  <span>Executive Dashboard</span>
+                </div>
               </button>
 
               <button
                 type="button"
+                id="sidebar-nav-leads"
                 onClick={() => onTabChange('leads')}
-                className={`w-full flex items-center gap-3 px-3 py-2 rounded-xl text-xs font-semibold transition-all ${
+                className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
                   activeTab === 'leads'
                     ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/30'
                     : 'text-slate-300 hover:text-white hover:bg-slate-800/70'
                 }`}
               >
-                <FileSpreadsheet className="w-4 h-4" />
-                Lead Management
+                <div className="flex items-center gap-3">
+                  <FileSpreadsheet className="w-4 h-4" />
+                  <span>Lead Management</span>
+                </div>
+                {counts && counts.leads > 0 && (
+                  <span className="px-1.5 py-0.5 text-[10px] rounded-full bg-slate-800 text-slate-300 border border-slate-700">
+                    {counts.leads}
+                  </span>
+                )}
               </button>
 
               <button
                 type="button"
+                id="sidebar-nav-users"
                 onClick={() => onTabChange('users')}
-                className={`w-full flex items-center gap-3 px-3 py-2 rounded-xl text-xs font-semibold transition-all ${
+                className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
                   activeTab === 'users'
                     ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/30'
                     : 'text-slate-300 hover:text-white hover:bg-slate-800/70'
                 }`}
               >
-                <Users className="w-4 h-4" />
-                User Management & RBAC
+                <div className="flex items-center gap-3">
+                  <Users className="w-4 h-4" />
+                  <span>User Directory & RBAC</span>
+                </div>
+                {counts && counts.users > 0 && (
+                  <span className="px-1.5 py-0.5 text-[10px] rounded-full bg-slate-800 text-slate-300 border border-slate-700">
+                    {counts.users}
+                  </span>
+                )}
               </button>
 
               <button
                 type="button"
+                id="sidebar-nav-teams"
                 onClick={() => onTabChange('teams')}
-                className={`w-full flex items-center gap-3 px-3 py-2 rounded-xl text-xs font-semibold transition-all ${
+                className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
                   activeTab === 'teams'
                     ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/30'
                     : 'text-slate-300 hover:text-white hover:bg-slate-800/70'
                 }`}
               >
-                <Layers className="w-4 h-4" />
-                Teams by Profession
+                <div className="flex items-center gap-3">
+                  <Layers className="w-4 h-4" />
+                  <span>Teams by Profession</span>
+                </div>
+                {counts && counts.teams > 0 && (
+                  <span className="px-1.5 py-0.5 text-[10px] rounded-full bg-slate-800 text-slate-300 border border-slate-700">
+                    {counts.teams}
+                  </span>
+                )}
               </button>
 
               <button
                 type="button"
+                id="sidebar-nav-projects"
                 onClick={() => onTabChange('projects')}
-                className={`w-full flex items-center gap-3 px-3 py-2 rounded-xl text-xs font-semibold transition-all ${
+                className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
                   activeTab === 'projects'
                     ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/30'
                     : 'text-slate-300 hover:text-white hover:bg-slate-800/70'
                 }`}
               >
-                <FolderKanban className="w-4 h-4" />
-                Agency Projects
+                <div className="flex items-center gap-3">
+                  <FolderKanban className="w-4 h-4" />
+                  <span>Agency Projects</span>
+                </div>
+                {counts && counts.projects > 0 && (
+                  <span className="px-1.5 py-0.5 text-[10px] rounded-full bg-slate-800 text-slate-300 border border-slate-700">
+                    {counts.projects}
+                  </span>
+                )}
               </button>
 
               <button
                 type="button"
-                onClick={() => onTabChange('reports')}
-                className={`w-full flex items-center gap-3 px-3 py-2 rounded-xl text-xs font-semibold transition-all ${
-                  activeTab === 'reports'
-                    ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/30'
-                    : 'text-slate-300 hover:text-white hover:bg-slate-800/70'
-                }`}
-              >
-                <BarChart3 className="w-4 h-4" />
-                Reports & Conversion
-              </button>
-
-              <button
-                type="button"
+                id="sidebar-nav-audit"
                 onClick={() => onTabChange('audit')}
-                className={`w-full flex items-center gap-3 px-3 py-2 rounded-xl text-xs font-semibold transition-all ${
+                className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
                   activeTab === 'audit'
                     ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/30'
                     : 'text-slate-300 hover:text-white hover:bg-slate-800/70'
                 }`}
               >
-                <ShieldAlert className="w-4 h-4" />
-                Security & Audit Trail
+                <div className="flex items-center gap-3">
+                  <ShieldAlert className="w-4 h-4" />
+                  <span>Security & Audit Trail</span>
+                </div>
               </button>
             </nav>
           </div>
@@ -150,54 +174,76 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, onTabChange }) => {
             <nav className="space-y-1">
               <button
                 type="button"
-                onClick={() => onTabChange('teamlead_dashboard')}
-                className={`w-full flex items-center gap-3 px-3 py-2 rounded-xl text-xs font-semibold transition-all ${
-                  activeTab === 'teamlead_dashboard'
+                id="sidebar-nav-teamlead"
+                onClick={() => onTabChange('teamlead')}
+                className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
+                  activeTab === 'teamlead'
                     ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/30'
                     : 'text-slate-300 hover:text-white hover:bg-slate-800/70'
                 }`}
               >
-                <LayoutDashboard className="w-4 h-4" />
-                Team Lead Dashboard
+                <div className="flex items-center gap-3">
+                  <LayoutDashboard className="w-4 h-4" />
+                  <span>Team Lead Console</span>
+                </div>
               </button>
 
               <button
                 type="button"
-                onClick={() => onTabChange('my_team')}
-                className={`w-full flex items-center gap-3 px-3 py-2 rounded-xl text-xs font-semibold transition-all ${
-                  activeTab === 'my_team'
-                    ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/30'
-                    : 'text-slate-300 hover:text-white hover:bg-slate-800/70'
-                }`}
-              >
-                <Users className="w-4 h-4" />
-                Team Members & IDs
-              </button>
-
-              <button
-                type="button"
-                onClick={() => onTabChange('team_projects')}
-                className={`w-full flex items-center gap-3 px-3 py-2 rounded-xl text-xs font-semibold transition-all ${
-                  activeTab === 'team_projects'
-                    ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/30'
-                    : 'text-slate-300 hover:text-white hover:bg-slate-800/70'
-                }`}
-              >
-                <Briefcase className="w-4 h-4" />
-                Project Assignments
-              </button>
-
-              <button
-                type="button"
+                id="sidebar-nav-tl-leads"
                 onClick={() => onTabChange('leads')}
-                className={`w-full flex items-center gap-3 px-3 py-2 rounded-xl text-xs font-semibold transition-all ${
+                className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
                   activeTab === 'leads'
                     ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/30'
                     : 'text-slate-300 hover:text-white hover:bg-slate-800/70'
                 }`}
               >
-                <FileSpreadsheet className="w-4 h-4" />
-                Assigned Leads
+                <div className="flex items-center gap-3">
+                  <FileSpreadsheet className="w-4 h-4" />
+                  <span>Assigned Leads</span>
+                </div>
+                {counts && counts.leads > 0 && (
+                  <span className="px-1.5 py-0.5 text-[10px] rounded-full bg-slate-800 text-slate-300 border border-slate-700">
+                    {counts.leads}
+                  </span>
+                )}
+              </button>
+
+              <button
+                type="button"
+                id="sidebar-nav-tl-teams"
+                onClick={() => onTabChange('teams')}
+                className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
+                  activeTab === 'teams'
+                    ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/30'
+                    : 'text-slate-300 hover:text-white hover:bg-slate-800/70'
+                }`}
+              >
+                <div className="flex items-center gap-3">
+                  <Users className="w-4 h-4" />
+                  <span>My Squad & Staff</span>
+                </div>
+              </button>
+
+              <button
+                type="button"
+                id="sidebar-nav-tl-projects"
+                onClick={() => onTabChange('projects')}
+                className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
+                  activeTab === 'projects'
+                    ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/30'
+                    : 'text-slate-300 hover:text-white hover:bg-slate-800/70'
+                }`}
+              >
+                <div className="flex items-center gap-3">
+                  <Briefcase className="w-4 h-4" />
+                  <span>Squad Projects</span>
+                </div>
+                {counts && counts.projects > 0 && (
+                  <span className="px-1.5 py-0.5 text-[10px] rounded-full bg-slate-800 text-slate-300 border border-slate-700">
+                    {counts.projects}
+                  </span>
+                )}
               </button>
             </nav>
           </div>
@@ -211,41 +257,39 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, onTabChange }) => {
             <nav className="space-y-1">
               <button
                 type="button"
-                onClick={() => onTabChange('employee_dashboard')}
-                className={`w-full flex items-center gap-3 px-3 py-2 rounded-xl text-xs font-semibold transition-all ${
-                  activeTab === 'employee_dashboard'
+                id="sidebar-nav-employee"
+                onClick={() => onTabChange('employee')}
+                className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
+                  activeTab === 'employee'
                     ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/30'
                     : 'text-slate-300 hover:text-white hover:bg-slate-800/70'
                 }`}
               >
-                <LayoutDashboard className="w-4 h-4" />
-                My Dashboard
+                <div className="flex items-center gap-3">
+                  <LayoutDashboard className="w-4 h-4" />
+                  <span>Specialist Workspace</span>
+                </div>
               </button>
 
               <button
                 type="button"
-                onClick={() => onTabChange('employee_projects')}
-                className={`w-full flex items-center gap-3 px-3 py-2 rounded-xl text-xs font-semibold transition-all ${
-                  activeTab === 'employee_projects'
+                id="sidebar-nav-emp-projects"
+                onClick={() => onTabChange('projects')}
+                className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
+                  activeTab === 'projects'
                     ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/30'
                     : 'text-slate-300 hover:text-white hover:bg-slate-800/70'
                 }`}
               >
-                <CheckCircle2 className="w-4 h-4" />
-                My Projects & Deliverables
-              </button>
-
-              <button
-                type="button"
-                onClick={() => onTabChange('employee_profile')}
-                className={`w-full flex items-center gap-3 px-3 py-2 rounded-xl text-xs font-semibold transition-all ${
-                  activeTab === 'employee_profile'
-                    ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/30'
-                    : 'text-slate-300 hover:text-white hover:bg-slate-800/70'
-                }`}
-              >
-                <UserCheck className="w-4 h-4" />
-                My Profile & Contract
+                <div className="flex items-center gap-3">
+                  <FolderKanban className="w-4 h-4" />
+                  <span>My Assigned Projects</span>
+                </div>
+                {counts && counts.projects > 0 && (
+                  <span className="px-1.5 py-0.5 text-[10px] rounded-full bg-slate-800 text-slate-300 border border-slate-700">
+                    {counts.projects}
+                  </span>
+                )}
               </button>
             </nav>
           </div>
@@ -258,23 +302,29 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, onTabChange }) => {
           </div>
           <button
             type="button"
+            id="sidebar-nav-discussions"
             onClick={() => onTabChange('discussions')}
-            className={`w-full flex items-center gap-3 px-3 py-2 rounded-xl text-xs font-semibold transition-all ${
+            className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
               activeTab === 'discussions'
                 ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/30'
                 : 'text-slate-300 hover:text-white hover:bg-slate-800/70'
             }`}
           >
-            <MessageSquare className="w-4 h-4" />
-            Discussions & Groups
+            <div className="flex items-center gap-3">
+              <MessageSquare className="w-4 h-4" />
+              <span>Team Discussions</span>
+            </div>
           </button>
         </div>
       </div>
 
       {/* Footer info */}
       <div className="p-4 border-t border-slate-800 text-xs text-slate-400">
-        <div className="font-semibold text-slate-300">StudioAdsPro v1.0</div>
-        <div className="text-[10px]">Real-time Firestore CRM</div>
+        <div className="font-semibold text-slate-300">StudioAdsPro CRM</div>
+        <div className="text-[10px] text-emerald-400 flex items-center gap-1 mt-0.5">
+          <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 inline-block animate-pulse" />
+          Live Firestore Sync
+        </div>
       </div>
     </aside>
   );

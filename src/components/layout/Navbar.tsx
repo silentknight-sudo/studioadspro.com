@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
 import {
-  Building2,
   Bell,
   Search,
   LogOut,
@@ -13,7 +12,7 @@ import {
   Check,
   Eye,
   RotateCcw,
-  Database,
+  Building2,
 } from 'lucide-react';
 import { UserRole, UserStatus } from '../../types';
 
@@ -33,6 +32,8 @@ export const Navbar: React.FC<NavbarProps> = ({
   searchTerm = '',
   pendingInvitesCount = 0,
   onOpenInvites,
+  onOpenCreateLead,
+  onOpenCreateProject,
 }) => {
   const {
     profile,
@@ -41,25 +42,10 @@ export const Navbar: React.FC<NavbarProps> = ({
     updateProfileData,
     switchRoleSimulation,
     simulatedRole,
-    triggerDataSeed,
   } = useAuth();
-  const { success, info } = useToast();
-  const [seeding, setSeeding] = useState(false);
+  const { success } = useToast();
   const [menuOpen, setMenuOpen] = useState(false);
   const [roleSwitcherOpen, setRoleSwitcherOpen] = useState(false);
-
-  const handleSeedData = async () => {
-    setSeeding(true);
-    try {
-      await triggerDataSeed();
-      success('Sample CRM dataset loaded successfully!');
-      setMenuOpen(false);
-    } catch (e: any) {
-      info(e.message || 'Seed completed.');
-    } finally {
-      setSeeding(false);
-    }
-  };
 
   const handleStatusChange = async (newStatus: UserStatus) => {
     await updateProfileData({ status: newStatus });
@@ -232,6 +218,29 @@ export const Navbar: React.FC<NavbarProps> = ({
           )}
         </div>
 
+        {/* Quick Actions: + Lead & + Project */}
+        {onOpenCreateLead && (
+          <button
+            type="button"
+            id="navbar-create-lead-btn"
+            onClick={onOpenCreateLead}
+            className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold shadow-md shadow-blue-600/20 transition-all cursor-pointer"
+          >
+            <span>+ Lead</span>
+          </button>
+        )}
+
+        {onOpenCreateProject && (
+          <button
+            type="button"
+            id="navbar-create-project-btn"
+            onClick={onOpenCreateProject}
+            className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold border border-slate-700 transition-all cursor-pointer"
+          >
+            <span>+ Project</span>
+          </button>
+        )}
+
         {/* Real role badge */}
         <div className="hidden sm:block">{getRoleBadge()}</div>
 
@@ -318,16 +327,7 @@ export const Navbar: React.FC<NavbarProps> = ({
 
               <button
                 type="button"
-                onClick={handleSeedData}
-                disabled={seeding}
-                className="w-full flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-medium text-blue-400 hover:bg-blue-500/10 transition-colors cursor-pointer disabled:opacity-50"
-              >
-                <Database className="w-4 h-4" />
-                <span>{seeding ? 'Seeding CRM Data...' : 'Seed / Top-Up Sample Data'}</span>
-              </button>
-
-              <button
-                type="button"
+                id="navbar-signout-btn"
                 onClick={logOut}
                 className="w-full flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-medium text-rose-400 hover:bg-rose-500/10 transition-colors cursor-pointer"
               >

@@ -58,6 +58,15 @@ export const UserManagement: React.FC<UserManagementProps> = ({
   const [modalOpen, setModalOpen] = useState(initialCreateOpen);
   const [passwordModalUser, setPasswordModalUser] = useState<UserProfile | null>(null);
   const [tempPassword, setTempPassword] = useState('');
+  const [userToDelete, setUserToDelete] = useState<UserProfile | null>(null);
+
+  React.useEffect(() => {
+    if (initialCreateOpen) {
+      resetForm();
+      setModalOpen(true);
+      onCloseCreateModal?.();
+    }
+  }, [initialCreateOpen]);
 
   // Form states for creating new user
   const [name, setName] = useState('');
@@ -162,7 +171,10 @@ export const UserManagement: React.FC<UserManagementProps> = ({
   const handleResetPassword = async () => {
     if (!passwordModalUser || !tempPassword.trim()) return;
     try {
-      // Log admin password reset action
+      await updateDoc(doc(db, 'users', passwordModalUser.id), {
+        password: tempPassword.trim(),
+        lastPasswordReset: new Date().toISOString(),
+      });
       await logAuditEvent(
         'PASSWORD_RESET',
         profile?.email || 'Admin',
@@ -172,29 +184,41 @@ export const UserManagement: React.FC<UserManagementProps> = ({
       setPasswordModalUser(null);
       setTempPassword('');
     } catch (err) {
+      handleFirestoreError(err, OperationType.UPDATE, `users/${passwordModalUser.id}`);
       error('Failed to reset password.');
     }
   };
 
-  const handleDeleteUser = async (targetUser: UserProfile) => {
+  const confirmDeleteUser = async () => {
+    if (!userToDelete) return;
+    const target = userToDelete;
+    setUserToDelete(null);
+
+    if (target.id === profile?.id) {
+      error('You cannot delete your own account.');
+      return;
+    }
+
+    try {
+      await deleteDoc(doc(db, 'users', target.id));
+      await logAuditEvent(
+        'USER_DELETED',
+        profile?.email || 'Admin',
+        `Removed user "${target.name}" (${target.email})`
+      );
+      success(`User ${target.name} removed from directory.`);
+    } catch (err) {
+      handleFirestoreError(err, OperationType.DELETE, `users/${target.id}`);
+      error('Failed to delete user.');
+    }
+  };
+
+  const handleDeleteUser = (targetUser: UserProfile) => {
     if (targetUser.id === profile?.id) {
       error('You cannot delete your own account.');
       return;
     }
-    if (!window.confirm(`Are you sure you want to remove user "${targetUser.name}"?`)) return;
-
-    try {
-      await deleteDoc(doc(db, 'users', targetUser.id));
-      await logAuditEvent(
-        'USER_DELETED',
-        profile?.email || 'Admin',
-        `Removed user "${targetUser.name}" (${targetUser.email})`
-      );
-      success(`User ${targetUser.name} removed from directory.`);
-    } catch (err) {
-      handleFirestoreError(err, OperationType.DELETE, `users/${targetUser.id}`);
-      error('Failed to delete user.');
-    }
+    setUserToDelete(targetUser);
   };
 
   const filteredUsers = useMemo(() => {
@@ -648,6 +672,37 @@ export const UserManagement: React.FC<UserManagementProps> = ({
                 className="px-4 py-1.5 rounded-xl text-xs font-semibold text-white bg-blue-600 hover:bg-blue-500 shadow-md cursor-pointer"
               >
                 Update Password
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete User Confirmation Modal */}
+      {userToDelete && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm">
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-sm shadow-2xl p-5 space-y-4">
+            <div className="flex items-center gap-3 text-rose-400">
+              <Trash2 className="w-5 h-5" />
+              <h3 className="text-sm font-bold text-white">Delete User Account</h3>
+            </div>
+            <p className="text-xs text-slate-300 leading-relaxed">
+              Are you sure you want to remove <strong className="text-white">{userToDelete.name}</strong> ({userToDelete.email}) from the directory? This action cannot be undone.
+            </p>
+            <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-800">
+              <button
+                type="button"
+                onClick={() => setUserToDelete(null)}
+                className="px-3.5 py-1.5 rounded-xl text-xs font-semibold text-slate-400 hover:text-white"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={confirmDeleteUser}
+                className="px-4 py-1.5 rounded-xl text-xs font-semibold text-white bg-rose-600 hover:bg-rose-500 shadow-md cursor-pointer"
+              >
+                Delete User
               </button>
             </div>
           </div>

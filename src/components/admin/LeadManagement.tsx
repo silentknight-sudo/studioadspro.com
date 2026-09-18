@@ -83,6 +83,15 @@ export const LeadManagement: React.FC<LeadManagementProps> = ({
   const [modalOpen, setModalOpen] = useState(initialCreateOpen);
   const [editingLead, setEditingLead] = useState<Lead | null>(null);
   const [assignModalLead, setAssignModalLead] = useState<Lead | null>(null);
+  const [leadToDelete, setLeadToDelete] = useState<Lead | null>(null);
+  const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
+
+  React.useEffect(() => {
+    if (initialCreateOpen) {
+      openCreate();
+      onCloseCreateModal?.();
+    }
+  }, [initialCreateOpen]);
 
   // Form states
   const [clientName, setClientName] = useState('');
@@ -218,16 +227,23 @@ export const LeadManagement: React.FC<LeadManagementProps> = ({
     }
   };
 
-  const handleDeleteLead = async (lead: Lead) => {
-    if (!window.confirm(`Are you sure you want to delete lead "${lead.clientName}"?`)) return;
+  const confirmDeleteLead = async () => {
+    if (!leadToDelete) return;
+    const target = leadToDelete;
+    setLeadToDelete(null);
+
     try {
-      await deleteDoc(doc(db, 'leads', lead.id));
-      await logAuditEvent('LEAD_DELETED', profile?.email || 'Admin', `Deleted lead "${lead.clientName}"`);
-      success(`Lead "${lead.clientName}" deleted.`);
+      await deleteDoc(doc(db, 'leads', target.id));
+      await logAuditEvent('LEAD_DELETED', profile?.email || 'Admin', `Deleted lead "${target.clientName}"`);
+      success(`Lead "${target.clientName}" deleted.`);
     } catch (err) {
-      handleFirestoreError(err, OperationType.DELETE, `leads/${lead.id}`);
+      handleFirestoreError(err, OperationType.DELETE, `leads/${target.id}`);
       error('Failed to delete lead.');
     }
+  };
+
+  const handleDeleteLead = (lead: Lead) => {
+    setLeadToDelete(lead);
   };
 
   const handleSaveAssignment = async () => {
@@ -397,9 +413,9 @@ export const LeadManagement: React.FC<LeadManagementProps> = ({
     setSelectedLeadIds((prev) => (prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]));
   };
 
-  const handleBulkDelete = async () => {
+  const confirmExecuteBulkDelete = async () => {
+    setBulkDeleteOpen(false);
     if (selectedLeadIds.length === 0) return;
-    if (!window.confirm(`Delete ${selectedLeadIds.length} selected leads?`)) return;
 
     try {
       for (const id of selectedLeadIds) {
@@ -407,10 +423,15 @@ export const LeadManagement: React.FC<LeadManagementProps> = ({
       }
       await logAuditEvent('LEADS_BULK_DELETED', profile?.email || 'Admin', `Deleted ${selectedLeadIds.length} leads in bulk`);
       setSelectedLeadIds([]);
-      success(`Successfully removed ${selectedLeadIds.length} leads.`);
+      success(`Successfully removed leads.`);
     } catch (err) {
       error('Failed to delete some leads.');
     }
+  };
+
+  const handleBulkDelete = () => {
+    if (selectedLeadIds.length === 0) return;
+    setBulkDeleteOpen(true);
   };
 
   return (
@@ -1336,6 +1357,68 @@ export const LeadManagement: React.FC<LeadManagementProps> = ({
                   Save & Deploy Hierarchy
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Single Lead Confirmation Modal */}
+      {leadToDelete && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm">
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-sm shadow-2xl p-5 space-y-4">
+            <div className="flex items-center gap-3 text-rose-400">
+              <Trash2 className="w-5 h-5" />
+              <h3 className="text-sm font-bold text-white">Delete Lead</h3>
+            </div>
+            <p className="text-xs text-slate-300 leading-relaxed">
+              Are you sure you want to delete lead <strong className="text-white">"{leadToDelete.clientName}"</strong>? This action will permanently remove it from the pipeline.
+            </p>
+            <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-800">
+              <button
+                type="button"
+                onClick={() => setLeadToDelete(null)}
+                className="px-3.5 py-1.5 rounded-xl text-xs font-semibold text-slate-400 hover:text-white"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={confirmDeleteLead}
+                className="px-4 py-1.5 rounded-xl text-xs font-semibold text-white bg-rose-600 hover:bg-rose-500 shadow-md cursor-pointer"
+              >
+                Delete Lead
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Bulk Delete Leads Confirmation Modal */}
+      {bulkDeleteOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm">
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-sm shadow-2xl p-5 space-y-4">
+            <div className="flex items-center gap-3 text-rose-400">
+              <Trash2 className="w-5 h-5" />
+              <h3 className="text-sm font-bold text-white">Bulk Delete Leads</h3>
+            </div>
+            <p className="text-xs text-slate-300 leading-relaxed">
+              Are you sure you want to delete <strong className="text-rose-400 font-bold">{selectedLeadIds.length}</strong> selected leads? This action cannot be undone.
+            </p>
+            <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-800">
+              <button
+                type="button"
+                onClick={() => setBulkDeleteOpen(false)}
+                className="px-3.5 py-1.5 rounded-xl text-xs font-semibold text-slate-400 hover:text-white"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={confirmExecuteBulkDelete}
+                className="px-4 py-1.5 rounded-xl text-xs font-semibold text-white bg-rose-600 hover:bg-rose-500 shadow-md cursor-pointer"
+              >
+                Delete {selectedLeadIds.length} Leads
+              </button>
             </div>
           </div>
         </div>

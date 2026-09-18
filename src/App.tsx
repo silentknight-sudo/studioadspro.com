@@ -220,8 +220,14 @@ function MainAppContent() {
       <Navbar
         searchTerm={globalSearch}
         onSearchChange={setGlobalSearch}
-        onOpenCreateLead={() => setLeadModalOpen(true)}
-        onOpenCreateProject={() => setProjectModalOpen(true)}
+        onOpenCreateLead={() => {
+          setActiveTab('leads');
+          setLeadModalOpen(true);
+        }}
+        onOpenCreateProject={() => {
+          setActiveTab('projects');
+          setProjectModalOpen(true);
+        }}
       />
 
       {/* Body Layout: Sidebar + Main Stage */}
@@ -243,10 +249,22 @@ function MainAppContent() {
                 teams={teams}
                 audits={audits}
                 onNavigate={(tab) => setActiveTab(tab)}
-                onOpenCreateLead={() => setLeadModalOpen(true)}
-                onOpenCreateUser={() => setUserModalOpen(true)}
-                onOpenCreateTeam={() => setTeamModalOpen(true)}
-                onOpenCreateProject={() => setProjectModalOpen(true)}
+                onOpenCreateLead={() => {
+                  setActiveTab('leads');
+                  setLeadModalOpen(true);
+                }}
+                onOpenCreateUser={() => {
+                  setActiveTab('users');
+                  setUserModalOpen(true);
+                }}
+                onOpenCreateTeam={() => {
+                  setActiveTab('teams');
+                  setTeamModalOpen(true);
+                }}
+                onOpenCreateProject={() => {
+                  setActiveTab('projects');
+                  setProjectModalOpen(true);
+                }}
               />
             )}
 
