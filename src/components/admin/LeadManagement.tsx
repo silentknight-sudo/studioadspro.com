@@ -1062,9 +1062,9 @@ export const LeadManagement: React.FC<LeadManagementProps> = ({
 
             {/* Workflow Visual Hierarchy Bar */}
             <div className="bg-slate-950/70 border-b border-slate-800/80 px-5 py-3">
-              <div className="flex items-center justify-between text-xs">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-2 text-xs">
                 <div className="flex items-center gap-2">
-                  <div className="w-6 h-6 rounded-full bg-blue-500/20 text-blue-400 border border-blue-500/30 flex items-center justify-center font-bold text-[10px]">
+                  <div className="w-6 h-6 rounded-full bg-blue-500/20 text-blue-400 border border-blue-500/30 flex items-center justify-center font-bold text-[10px] shrink-0">
                     1
                   </div>
                   <div>
@@ -1073,10 +1073,10 @@ export const LeadManagement: React.FC<LeadManagementProps> = ({
                   </div>
                 </div>
 
-                <ArrowRight className="w-4 h-4 text-slate-600" />
+                <ArrowRight className="w-4 h-4 text-slate-600 rotate-90 sm:rotate-0 self-start sm:self-auto" />
 
                 <div className="flex items-center gap-2">
-                  <div className="w-6 h-6 rounded-full bg-amber-500/20 text-amber-400 border border-amber-500/30 flex items-center justify-center font-bold text-[10px]">
+                  <div className="w-6 h-6 rounded-full bg-amber-500/20 text-amber-400 border border-amber-500/30 flex items-center justify-center font-bold text-[10px] shrink-0">
                     2
                   </div>
                   <div>
@@ -1087,10 +1087,10 @@ export const LeadManagement: React.FC<LeadManagementProps> = ({
                   </div>
                 </div>
 
-                <ArrowRight className="w-4 h-4 text-slate-600" />
+                <ArrowRight className="w-4 h-4 text-slate-600 rotate-90 sm:rotate-0 self-start sm:self-auto" />
 
                 <div className="flex items-center gap-2">
-                  <div className="w-6 h-6 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 flex items-center justify-center font-bold text-[10px]">
+                  <div className="w-6 h-6 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 flex items-center justify-center font-bold text-[10px] shrink-0">
                     3
                   </div>
                   <div>
