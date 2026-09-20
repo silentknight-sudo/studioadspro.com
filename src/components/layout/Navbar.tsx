@@ -10,10 +10,9 @@ import {
   Briefcase,
   ChevronDown,
   Check,
-  Eye,
-  RotateCcw,
+  Menu,
 } from 'lucide-react';
-import { UserRole, UserStatus } from '../../types';
+import { UserStatus } from '../../types';
 
 interface NavbarProps {
   onSearch?: (term: string) => void;
@@ -23,6 +22,7 @@ interface NavbarProps {
   onOpenInvites?: () => void;
   onOpenCreateLead?: () => void;
   onOpenCreateProject?: () => void;
+  onToggleSidebar?: () => void;
 }
 
 export const Navbar: React.FC<NavbarProps> = ({
@@ -33,18 +33,11 @@ export const Navbar: React.FC<NavbarProps> = ({
   onOpenInvites,
   onOpenCreateLead,
   onOpenCreateProject,
+  onToggleSidebar,
 }) => {
-  const {
-    profile,
-    role,
-    logOut,
-    updateProfileData,
-    switchRoleSimulation,
-    simulatedRole,
-  } = useAuth();
+  const { profile, role, logOut, updateProfileData } = useAuth();
   const { success } = useToast();
   const [menuOpen, setMenuOpen] = useState(false);
-  const [roleSwitcherOpen, setRoleSwitcherOpen] = useState(false);
 
   const handleStatusChange = async (newStatus: UserStatus) => {
     await updateProfileData({ status: newStatus });
@@ -55,16 +48,6 @@ export const Navbar: React.FC<NavbarProps> = ({
   const handleSearchInput = (val: string) => {
     onSearch?.(val);
     onSearchChange?.(val);
-  };
-
-  const handleRoleSimulation = (newRole: UserRole | null) => {
-    switchRoleSimulation(newRole);
-    if (newRole) {
-      success(`Switched role perspective to ${newRole}`);
-    } else {
-      success('Restored native account role');
-    }
-    setRoleSwitcherOpen(false);
   };
 
   const getRoleBadge = () => {
@@ -94,9 +77,19 @@ export const Navbar: React.FC<NavbarProps> = ({
   };
 
   return (
-    <header className="sticky top-0 z-30 h-16 bg-slate-900/80 backdrop-blur-md border-b border-slate-800 flex items-center justify-between px-4 lg:px-8">
+    <header className="sticky top-0 z-30 h-16 bg-slate-900/80 backdrop-blur-md border-b border-slate-800 flex items-center justify-between px-3 sm:px-4 lg:px-8 gap-2">
       {/* Brand & Search */}
-      <div className="flex items-center gap-6 flex-1 max-w-xl">
+      <div className="flex items-center gap-2 sm:gap-6 flex-1 min-w-0 max-w-xl">
+        {onToggleSidebar && (
+          <button
+            type="button"
+            onClick={onToggleSidebar}
+            className="lg:hidden p-2 -ml-1 rounded-xl text-slate-300 hover:text-white hover:bg-slate-800 transition-colors shrink-0"
+            aria-label="Toggle navigation menu"
+          >
+            <Menu className="w-5 h-5" />
+          </button>
+        )}
         <div className="flex items-center gap-3 shrink-0">
           <div className="w-9 h-9 rounded-xl overflow-hidden bg-slate-950 border border-slate-700/60 flex items-center justify-center shadow-md shadow-blue-900/20 p-1">
             <img
@@ -132,100 +125,7 @@ export const Navbar: React.FC<NavbarProps> = ({
       </div>
 
       {/* Right controls */}
-      <div className="flex items-center gap-2.5 sm:gap-3">
-        {/* Role perspective switcher (great for testing all 3 roles without login issues) */}
-        <div className="relative">
-          <button
-            type="button"
-            onClick={() => setRoleSwitcherOpen(!roleSwitcherOpen)}
-            className={`flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-xs font-semibold border transition-all cursor-pointer ${
-              simulatedRole
-                ? 'bg-purple-500/20 text-purple-300 border-purple-500/40 hover:bg-purple-500/30'
-                : 'bg-slate-800/80 text-slate-300 border-slate-700 hover:bg-slate-700/80'
-            }`}
-            title="Switch role view perspective"
-          >
-            <Eye className="w-3.5 h-3.5 text-purple-400" />
-            <span className="hidden sm:inline text-[11px] text-slate-400 font-normal">View As:</span>
-            <span>{role}</span>
-            <ChevronDown className="w-3 h-3 text-slate-400" />
-          </button>
-
-          {roleSwitcherOpen && (
-            <div className="absolute right-0 mt-2 w-56 rounded-2xl bg-slate-900 border border-slate-800 shadow-2xl p-2 z-50 animate-in fade-in slide-in-from-top-2">
-              <div className="px-3 py-1.5 border-b border-slate-800 mb-1">
-                <div className="text-[11px] font-semibold text-slate-300 uppercase tracking-wider">
-                  Test Role Perspectives
-                </div>
-                <div className="text-[10px] text-slate-400 mt-0.5">
-                  Simulate access tiers for testing
-                </div>
-              </div>
-
-              <button
-                type="button"
-                onClick={() => handleRoleSimulation('ADMIN')}
-                className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-medium transition-colors ${
-                  role === 'ADMIN' && simulatedRole === 'ADMIN'
-                    ? 'bg-rose-500/20 text-rose-300'
-                    : 'text-slate-300 hover:bg-slate-800'
-                }`}
-              >
-                <div className="flex items-center gap-2">
-                  <Shield className="w-3.5 h-3.5 text-rose-400" />
-                  <span>Admin View</span>
-                </div>
-                {role === 'ADMIN' && <Check className="w-3.5 h-3.5 text-rose-400" />}
-              </button>
-
-              <button
-                type="button"
-                onClick={() => handleRoleSimulation('TEAM_LEAD')}
-                className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-medium transition-colors ${
-                  role === 'TEAM_LEAD'
-                    ? 'bg-amber-500/20 text-amber-300'
-                    : 'text-slate-300 hover:bg-slate-800'
-                }`}
-              >
-                <div className="flex items-center gap-2">
-                  <Briefcase className="w-3.5 h-3.5 text-amber-400" />
-                  <span>Team Lead View</span>
-                </div>
-                {role === 'TEAM_LEAD' && <Check className="w-3.5 h-3.5 text-amber-400" />}
-              </button>
-
-              <button
-                type="button"
-                onClick={() => handleRoleSimulation('EMPLOYEE')}
-                className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-medium transition-colors ${
-                  role === 'EMPLOYEE'
-                    ? 'bg-blue-500/20 text-blue-300'
-                    : 'text-slate-300 hover:bg-slate-800'
-                }`}
-              >
-                <div className="flex items-center gap-2">
-                  <User className="w-3.5 h-3.5 text-blue-400" />
-                  <span>Employee View</span>
-                </div>
-                {role === 'EMPLOYEE' && <Check className="w-3.5 h-3.5 text-blue-400" />}
-              </button>
-
-              {simulatedRole && (
-                <div className="pt-1.5 border-t border-slate-800 mt-1">
-                  <button
-                    type="button"
-                    onClick={() => handleRoleSimulation(null)}
-                    className="w-full flex items-center gap-2 px-3 py-1.5 rounded-lg text-[11px] text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
-                  >
-                    <RotateCcw className="w-3 h-3 text-slate-400" />
-                    Reset to native profile
-                  </button>
-                </div>
-              )}
-            </div>
-          )}
-        </div>
-
+      <div className="flex items-center gap-2 sm:gap-3">
         {/* Quick Actions: + Lead & + Project */}
         {onOpenCreateLead && (
           <button

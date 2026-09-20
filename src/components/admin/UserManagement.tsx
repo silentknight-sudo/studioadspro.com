@@ -11,6 +11,7 @@ import {
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
 import { logAuditEvent } from '../../lib/audit';
+import { hashPassword } from '../../lib/crypto';
 import { db, handleFirestoreError, OperationType } from '../../lib/firebase';
 import {
   doc,
@@ -113,7 +114,8 @@ export const UserManagement: React.FC<UserManagementProps> = ({
     };
 
     try {
-      await setDoc(doc(db, 'users', cleanId), { ...newUser, password: password.trim() });
+      const passwordHash = await hashPassword(password.trim());
+      await setDoc(doc(db, 'users', cleanId), { ...newUser, passwordHash });
       if (role === 'ADMIN') {
         await setDoc(doc(db, 'admins', cleanId), {
           email: email.trim().toLowerCase(),
@@ -171,8 +173,10 @@ export const UserManagement: React.FC<UserManagementProps> = ({
   const handleResetPassword = async () => {
     if (!passwordModalUser || !tempPassword.trim()) return;
     try {
+      const passwordHash = await hashPassword(tempPassword.trim());
       await updateDoc(doc(db, 'users', passwordModalUser.id), {
-        password: tempPassword.trim(),
+        passwordHash,
+        password: null,
         lastPasswordReset: new Date().toISOString(),
       });
       await logAuditEvent(

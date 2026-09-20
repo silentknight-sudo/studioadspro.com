@@ -32,13 +32,34 @@ interface SidebarProps {
     users: number;
     audits: number;
   };
+  isOpen?: boolean;
+  onClose?: () => void;
 }
 
-export const Sidebar: React.FC<SidebarProps> = ({ activeTab, onTabChange, counts }) => {
+export const Sidebar: React.FC<SidebarProps> = ({ activeTab, onTabChange, counts, isOpen = false, onClose }) => {
   const { role } = useAuth();
 
+  const handleTabChange = (tab: NavTab) => {
+    onTabChange(tab);
+    onClose?.();
+  };
+
   return (
-    <aside className="w-64 bg-slate-900 border-r border-slate-800 flex flex-col justify-between shrink-0 min-h-[calc(100vh-4rem)]">
+    <>
+      {/* Mobile backdrop */}
+      {isOpen && (
+        <div
+          className="fixed inset-0 z-40 bg-slate-950/70 backdrop-blur-sm lg:hidden"
+          onClick={onClose}
+          aria-hidden="true"
+        />
+      )}
+      <aside
+        className={`w-72 sm:w-64 bg-slate-900 border-r border-slate-800 flex flex-col justify-between shrink-0
+          fixed inset-y-0 left-0 z-50 h-full overflow-y-auto transition-transform duration-200 ease-out
+          lg:static lg:z-auto lg:h-auto lg:min-h-[calc(100vh-4rem)] lg:translate-x-0
+          ${isOpen ? 'translate-x-0' : '-translate-x-full'}`}
+      >
       <div className="p-4 space-y-6">
         {/* Navigation Sections */}
         {role === 'ADMIN' && (
@@ -50,7 +71,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, onTabChange, counts
               <button
                 type="button"
                 id="sidebar-nav-dashboard"
-                onClick={() => onTabChange('dashboard')}
+                onClick={() => handleTabChange('dashboard')}
                 className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
                   activeTab === 'dashboard'
                     ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/30'
@@ -66,7 +87,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, onTabChange, counts
               <button
                 type="button"
                 id="sidebar-nav-leads"
-                onClick={() => onTabChange('leads')}
+                onClick={() => handleTabChange('leads')}
                 className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
                   activeTab === 'leads'
                     ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/30'
@@ -87,7 +108,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, onTabChange, counts
               <button
                 type="button"
                 id="sidebar-nav-users"
-                onClick={() => onTabChange('users')}
+                onClick={() => handleTabChange('users')}
                 className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
                   activeTab === 'users'
                     ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/30'
@@ -108,7 +129,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, onTabChange, counts
               <button
                 type="button"
                 id="sidebar-nav-teams"
-                onClick={() => onTabChange('teams')}
+                onClick={() => handleTabChange('teams')}
                 className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
                   activeTab === 'teams'
                     ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/30'
@@ -129,7 +150,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, onTabChange, counts
               <button
                 type="button"
                 id="sidebar-nav-projects"
-                onClick={() => onTabChange('projects')}
+                onClick={() => handleTabChange('projects')}
                 className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
                   activeTab === 'projects'
                     ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/30'
@@ -150,7 +171,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, onTabChange, counts
               <button
                 type="button"
                 id="sidebar-nav-audit"
-                onClick={() => onTabChange('audit')}
+                onClick={() => handleTabChange('audit')}
                 className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
                   activeTab === 'audit'
                     ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/30'
@@ -175,7 +196,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, onTabChange, counts
               <button
                 type="button"
                 id="sidebar-nav-teamlead"
-                onClick={() => onTabChange('teamlead')}
+                onClick={() => handleTabChange('teamlead')}
                 className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
                   activeTab === 'teamlead'
                     ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/30'
@@ -191,7 +212,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, onTabChange, counts
               <button
                 type="button"
                 id="sidebar-nav-tl-leads"
-                onClick={() => onTabChange('leads')}
+                onClick={() => handleTabChange('leads')}
                 className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
                   activeTab === 'leads'
                     ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/30'
@@ -212,7 +233,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, onTabChange, counts
               <button
                 type="button"
                 id="sidebar-nav-tl-teams"
-                onClick={() => onTabChange('teams')}
+                onClick={() => handleTabChange('teams')}
                 className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
                   activeTab === 'teams'
                     ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/30'
@@ -228,7 +249,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, onTabChange, counts
               <button
                 type="button"
                 id="sidebar-nav-tl-projects"
-                onClick={() => onTabChange('projects')}
+                onClick={() => handleTabChange('projects')}
                 className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
                   activeTab === 'projects'
                     ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/30'
@@ -258,7 +279,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, onTabChange, counts
               <button
                 type="button"
                 id="sidebar-nav-employee"
-                onClick={() => onTabChange('employee')}
+                onClick={() => handleTabChange('employee')}
                 className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
                   activeTab === 'employee'
                     ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/30'
@@ -274,7 +295,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, onTabChange, counts
               <button
                 type="button"
                 id="sidebar-nav-emp-projects"
-                onClick={() => onTabChange('projects')}
+                onClick={() => handleTabChange('projects')}
                 className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
                   activeTab === 'projects'
                     ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/30'
@@ -303,7 +324,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, onTabChange, counts
           <button
             type="button"
             id="sidebar-nav-discussions"
-            onClick={() => onTabChange('discussions')}
+            onClick={() => handleTabChange('discussions')}
             className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
               activeTab === 'discussions'
                 ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/30'
@@ -341,6 +362,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, onTabChange, counts
           </div>
         </div>
       </div>
-    </aside>
+      </aside>
+    </>
   );
 };

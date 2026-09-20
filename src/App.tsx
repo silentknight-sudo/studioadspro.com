@@ -47,6 +47,7 @@ function MainAppContent() {
 
   const [activeTab, setActiveTab] = useState<NavTab>('dashboard');
   const [globalSearch, setGlobalSearch] = useState('');
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   // Collections state
   const [leads, setLeads] = useState<Lead[]>([]);
@@ -228,6 +229,7 @@ function MainAppContent() {
           setActiveTab('projects');
           setProjectModalOpen(true);
         }}
+        onToggleSidebar={() => setSidebarOpen((v) => !v)}
       />
 
       {/* Body Layout: Sidebar + Main Stage */}
@@ -236,10 +238,12 @@ function MainAppContent() {
           activeTab={activeTab}
           onTabChange={(tab) => setActiveTab(tab as NavTab)}
           counts={counts}
+          isOpen={sidebarOpen}
+          onClose={() => setSidebarOpen(false)}
         />
 
         {/* Dynamic Workspace Container */}
-        <main className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8">
+        <main className="flex-1 min-w-0 overflow-y-auto overflow-x-hidden p-3 sm:p-6 lg:p-8">
           <div className="max-w-7xl mx-auto space-y-6">
             {activeTab === 'dashboard' && (
               <AdminDashboard
