@@ -53,7 +53,13 @@ export interface FirestoreErrorInfo {
   };
 }
 
-export function handleFirestoreError(error: unknown, operationType: OperationType, path: string | null) {
+// Internal diagnostic detail (Firestore paths, operation type, the caller's
+// own auth metadata) is logged to the console for debugging only. It is
+// never put in the thrown Error's message, since that message is shown
+// directly to the user in toasts throughout the app — surfacing internal
+// document paths and auth internals there would hand anyone probing the UI
+// a map of the backend for free.
+export function handleFirestoreError(error: unknown, operationType: OperationType, path: string | null): never {
   const errInfo: FirestoreErrorInfo = {
     error: error instanceof Error ? error.message : String(error),
     authInfo: {
@@ -70,8 +76,15 @@ export function handleFirestoreError(error: unknown, operationType: OperationTyp
     operationType,
     path,
   };
-  console.error('Firestore Error: ', JSON.stringify(errInfo));
-  throw new Error(JSON.stringify(errInfo));
+  console.error('Firestore Error: ', errInfo);
+
+  const isPermissionDenied =
+    error instanceof Error && error.message.toLowerCase().includes('permission');
+  throw new Error(
+    isPermissionDenied
+      ? 'You do not have permission to perform this action.'
+      : 'Something went wrong. Please try again.'
+  );
 }
 
 // Skill constraint: Call getFromServer when booting to test connection
