@@ -1,4 +1,4 @@
-import { initializeApp } from 'firebase/app';
+import { initializeApp, getApps, deleteApp } from 'firebase/app';
 import { getAuth } from 'firebase/auth';
 import { getFirestore, doc, getDocFromServer } from 'firebase/firestore';
 import firebaseConfig from '../../firebase-applet-config.json';
@@ -6,6 +6,26 @@ import firebaseConfig from '../../firebase-applet-config.json';
 const app = initializeApp(firebaseConfig);
 export const db = getFirestore(app, firebaseConfig.firestoreDatabaseId);
 export const auth = getAuth(app);
+
+// Creating a user with the Firebase client SDK signs the caller in as that
+// new user. Admin-side account creation runs against a throwaway secondary
+// app instance instead, so creating an employee's login never displaces the
+// admin's own active session.
+export async function createUserOnSecondaryApp(email: string, password: string): Promise<string> {
+  const existing = getApps().find((a) => a.name === 'admin-provisioning');
+  if (existing) {
+    await deleteApp(existing);
+  }
+  const secondaryApp = initializeApp(firebaseConfig, 'admin-provisioning');
+  const secondaryAuth = getAuth(secondaryApp);
+  try {
+    const { createUserWithEmailAndPassword } = await import('firebase/auth');
+    const cred = await createUserWithEmailAndPassword(secondaryAuth, email, password);
+    return cred.user.uid;
+  } finally {
+    await deleteApp(secondaryApp);
+  }
+}
 
 export enum OperationType {
   CREATE = 'create',

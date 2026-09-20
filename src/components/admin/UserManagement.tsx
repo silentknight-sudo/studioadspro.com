@@ -11,8 +11,8 @@ import {
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
 import { logAuditEvent } from '../../lib/audit';
-import { hashPassword } from '../../lib/crypto';
-import { db, handleFirestoreError, OperationType } from '../../lib/firebase';
+import { db, auth, handleFirestoreError, OperationType, createUserOnSecondaryApp } from '../../lib/firebase';
+import { sendPasswordResetEmail } from 'firebase/auth';
 import {
   doc,
   setDoc,
@@ -58,7 +58,6 @@ export const UserManagement: React.FC<UserManagementProps> = ({
   // Modal states
   const [modalOpen, setModalOpen] = useState(initialCreateOpen);
   const [passwordModalUser, setPasswordModalUser] = useState<UserProfile | null>(null);
-  const [tempPassword, setTempPassword] = useState('');
   const [userToDelete, setUserToDelete] = useState<UserProfile | null>(null);
 
   React.useEffect(() => {
@@ -97,28 +96,35 @@ export const UserManagement: React.FC<UserManagementProps> = ({
       return;
     }
 
-    // Use normalized email as doc ID if offline / pre-created
-    const cleanId = email.trim().toLowerCase().replace(/[^a-zA-Z0-9]/g, '_');
-    const newUser: UserProfile = {
-      id: cleanId,
-      email: email.trim().toLowerCase(),
-      name: name.trim(),
-      role,
-      profession,
-      employmentType,
-      teamId: teamId || undefined,
-      createdBy: profile?.email || 'Admin',
-      createdAt: new Date().toISOString(),
-      status: 'ACTIVE',
-      phone: phone.trim() || undefined,
-    };
+    const normalizedEmail = email.trim().toLowerCase();
+    if (password.trim().length < 6) {
+      error('Password must be at least 6 characters (Firebase requirement).');
+      return;
+    }
 
     try {
-      const passwordHash = await hashPassword(password.trim());
-      await setDoc(doc(db, 'users', cleanId), { ...newUser, passwordHash });
+      // Real Firebase Authentication account — created on a throwaway secondary
+      // app instance so it never displaces the signed-in admin's own session.
+      const uid = await createUserOnSecondaryApp(normalizedEmail, password.trim());
+
+      const newUser: UserProfile = {
+        id: uid,
+        email: normalizedEmail,
+        name: name.trim(),
+        role,
+        profession,
+        employmentType,
+        teamId: teamId || undefined,
+        createdBy: profile?.email || 'Admin',
+        createdAt: new Date().toISOString(),
+        status: 'ACTIVE',
+        phone: phone.trim() || undefined,
+      };
+
+      await setDoc(doc(db, 'users', uid), newUser);
       if (role === 'ADMIN') {
-        await setDoc(doc(db, 'admins', cleanId), {
-          email: email.trim().toLowerCase(),
+        await setDoc(doc(db, 'admins', uid), {
+          email: normalizedEmail,
           createdAt: new Date().toISOString(),
         });
       }
@@ -126,16 +132,20 @@ export const UserManagement: React.FC<UserManagementProps> = ({
       await logAuditEvent(
         'USER_CREATED',
         profile?.email || 'Admin',
-        `Created user "${name}" (${email}) with role ${role} and profession ${profession}`
+        `Created user "${name}" (${normalizedEmail}) with role ${role} and profession ${profession}`
       );
 
       success(`User ${name} created successfully with temporary password: ${password}`);
       setModalOpen(false);
       resetForm();
       onCloseCreateModal?.();
-    } catch (err) {
-      handleFirestoreError(err, OperationType.WRITE, `users/${cleanId}`);
-      error('Failed to create user profile.');
+    } catch (err: any) {
+      if (err?.code === 'auth/email-already-in-use') {
+        error('An account with this email already exists.');
+      } else {
+        console.error(err);
+        error('Failed to create user account.');
+      }
     }
   };
 
@@ -171,25 +181,21 @@ export const UserManagement: React.FC<UserManagementProps> = ({
   };
 
   const handleResetPassword = async () => {
-    if (!passwordModalUser || !tempPassword.trim()) return;
+    if (!passwordModalUser) return;
     try {
-      const passwordHash = await hashPassword(tempPassword.trim());
-      await updateDoc(doc(db, 'users', passwordModalUser.id), {
-        passwordHash,
-        password: null,
-        lastPasswordReset: new Date().toISOString(),
-      });
+      // Real password resets go through Firebase's own secure email flow —
+      // nobody, including an admin, can see or set another user's password.
+      await sendPasswordResetEmail(auth, passwordModalUser.email);
       await logAuditEvent(
         'PASSWORD_RESET',
         profile?.email || 'Admin',
-        `Admin issued temporary password reset for user "${passwordModalUser.email}"`
+        `Admin triggered a password reset email for user "${passwordModalUser.email}"`
       );
-      success(`Temporary password set for ${passwordModalUser.name}: "${tempPassword}"`);
+      success(`Password reset email sent to ${passwordModalUser.email}.`);
       setPasswordModalUser(null);
-      setTempPassword('');
     } catch (err) {
-      handleFirestoreError(err, OperationType.UPDATE, `users/${passwordModalUser.id}`);
-      error('Failed to reset password.');
+      console.error(err);
+      error('Failed to send password reset email.');
     }
   };
 
@@ -454,12 +460,9 @@ export const UserManagement: React.FC<UserManagementProps> = ({
                               </button>
                               <button
                                 type="button"
-                                onClick={() => {
-                                  setPasswordModalUser(u);
-                                  setTempPassword('TempPass@2026');
-                                }}
+                                onClick={() => setPasswordModalUser(u)}
                                 className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800"
-                                title="Reset Temporary Password"
+                                title="Send Password Reset Email"
                               >
                                 <KeyRound className="w-3.5 h-3.5" />
                               </button>
@@ -637,7 +640,7 @@ export const UserManagement: React.FC<UserManagementProps> = ({
             <div className="flex items-center justify-between border-b border-slate-800 pb-3">
               <div className="flex items-center gap-2">
                 <Lock className="w-4 h-4 text-blue-400" />
-                <h3 className="text-sm font-bold text-white">Reset Temporary Password</h3>
+                <h3 className="text-sm font-bold text-white">Reset Password</h3>
               </div>
               <button
                 type="button"
@@ -649,18 +652,10 @@ export const UserManagement: React.FC<UserManagementProps> = ({
             </div>
 
             <p className="text-xs text-slate-400">
-              Set a temporary password for <span className="text-white font-semibold">{passwordModalUser.name}</span> ({passwordModalUser.email}).
+              This sends a secure password-reset link to{' '}
+              <span className="text-white font-semibold">{passwordModalUser.name}</span>'s email (
+              {passwordModalUser.email}). Nobody, including admins, can see or set their password directly.
             </p>
-
-            <div>
-              <label className="block text-xs font-semibold text-slate-300 mb-1">New Temporary Password</label>
-              <input
-                type="text"
-                value={tempPassword}
-                onChange={(e) => setTempPassword(e.target.value)}
-                className="w-full bg-slate-950 border border-slate-700 text-white rounded-xl px-3 py-2 text-xs focus:ring-1 focus:ring-blue-500 focus:outline-none"
-              />
-            </div>
 
             <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-800">
               <button
@@ -675,7 +670,7 @@ export const UserManagement: React.FC<UserManagementProps> = ({
                 onClick={handleResetPassword}
                 className="px-4 py-1.5 rounded-xl text-xs font-semibold text-white bg-blue-600 hover:bg-blue-500 shadow-md cursor-pointer"
               >
-                Update Password
+                Send Reset Email
               </button>
             </div>
           </div>
