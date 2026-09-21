@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
+import { sendPasswordResetEmail } from 'firebase/auth';
+import { auth } from '../../lib/firebase';
 import {
   Lock,
   User,
@@ -17,6 +19,7 @@ export const LoginView: React.FC = () => {
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [resetLoading, setResetLoading] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -38,6 +41,30 @@ export const LoginView: React.FC = () => {
       error(err.message || 'Authentication failed. Please verify credentials.');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleForgotPassword = async () => {
+    const emailInput = loginId.trim().toLowerCase();
+    if (!emailInput || !emailInput.includes('@')) {
+      error('Enter your account email above first, then click "Forgot password".');
+      return;
+    }
+    setResetLoading(true);
+    try {
+      await sendPasswordResetEmail(auth, emailInput);
+      success(`If an account exists for ${emailInput}, a reset link has been sent to it.`);
+    } catch (err: any) {
+      // Firebase's own enumeration protection means most failures should
+      // still show the generic success message above; only surface a real
+      // client-side problem (e.g. malformed input) here.
+      if (err?.code === 'auth/invalid-email') {
+        error('Please enter a valid email address.');
+      } else {
+        success(`If an account exists for ${emailInput}, a reset link has been sent to it.`);
+      }
+    } finally {
+      setResetLoading(false);
     }
   };
 
@@ -109,6 +136,14 @@ export const LoginView: React.FC = () => {
                 <label htmlFor="loginPassword" className="block text-xs font-medium text-slate-300">
                   Password
                 </label>
+                <button
+                  type="button"
+                  onClick={handleForgotPassword}
+                  disabled={resetLoading}
+                  className="text-[11px] font-medium text-blue-400 hover:text-blue-300 disabled:opacity-50 cursor-pointer"
+                >
+                  {resetLoading ? 'Sending…' : 'Forgot password?'}
+                </button>
               </div>
               <div className="relative">
                 <Lock className="w-4 h-4 text-slate-400 absolute left-3.5 top-3" />
