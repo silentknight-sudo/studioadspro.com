@@ -15,6 +15,20 @@ service cloud.firestore {
       return isSignedIn() && request.auth.uid == userId;
     }
 
+    // The caller's own Firestore profile — used to scope leads/projects to
+    // a team lead's team or an employee's own assignments.
+    function myProfile() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
+
+    function myTeamId() {
+      return isSignedIn() ? myProfile().get('teamId', '__none__') : '__none__';
+    }
+
+    function myRole() {
+      return isSignedIn() ? myProfile().get('role', '__none__') : '__none__';
+    }
+
     // Fixed bootstrap admin addresses — kept in sync with
     // PRECONFIGURED_ADMINS in src/context/AuthContext.tsx. Only these
     // identities may grant themselves the admins/{uid} bootstrap record.
@@ -47,27 +61,46 @@ service cloud.firestore {
       allow write: if isAdmin() || (isSelf(userId) && isBootstrapAdminEmail());
     }
 
-    // Core CRM data: any signed-in (i.e. admin-provisioned) account may read
-    // and collaborate on leads, teams, projects, discussions and messages.
-    // Nothing here is reachable without a real, admin-created login.
+    // Leads are visible to: admins (everything), the team lead of the team
+    // a lead is assigned to, and any employee individually listed in
+    // assignedEmployeeIds — nobody else. The client's App.tsx queries are
+    // written to match these same conditions with an explicit where()
+    // clause, which is required for Firestore to allow a "list"/onSnapshot
+    // query against a resource.data-dependent rule like this.
     match /leads/{leadId} {
-      allow read, write: if isSignedIn();
+      allow read: if isAdmin()
+        || (isSignedIn() && resource.data.get('assignedTeamId', '__none__') == myTeamId())
+        || (isSignedIn() && request.auth.uid in resource.data.get('assignedEmployeeIds', []));
+      allow create: if isAdmin();
+      allow update, delete: if isAdmin()
+        || (isSignedIn() && resource.data.get('assignedTeamId', '__none__') == myTeamId());
     }
 
     match /teams/{teamId} {
-      allow read, write: if isSignedIn();
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
     }
 
+    // Same scoping as leads, keyed on assignedTeamId / assignedEmployees.
     match /projects/{projectId} {
-      allow read, write: if isSignedIn();
+      allow read: if isAdmin()
+        || (isSignedIn() && resource.data.get('assignedTeamId', '__none__') == myTeamId())
+        || (isSignedIn() && request.auth.uid in resource.data.get('assignedEmployees', []));
+      allow create: if isAdmin() || myRole() == 'TEAM_LEAD';
+      allow update, delete: if isAdmin()
+        || (isSignedIn() && resource.data.get('assignedTeamId', '__none__') == myTeamId());
     }
 
+    // Discussion channels and their messages. Messages are a TOP-LEVEL
+    // collection (not nested under discussions) — the app queries
+    // /messages with a discussionId field, so the rule must match that
+    // same top-level path, not discussions/{id}/messages.
     match /discussions/{discussionId} {
       allow read, write: if isSignedIn();
+    }
 
-      match /messages/{messageId} {
-        allow read, write: if isSignedIn();
-      }
+    match /messages/{messageId} {
+      allow read, write: if isSignedIn();
     }
 
     match /invitations/{invitationId} {

@@ -25,6 +25,7 @@ import {
   collection,
   onSnapshot,
   query,
+  where,
   orderBy,
   limit,
 } from 'firebase/firestore';
@@ -66,9 +67,19 @@ function MainAppContent() {
   useEffect(() => {
     if (!user && !profile) return;
 
-    // Leads subscription
+    // Leads subscription — scoped by role. Admins see everything; a team
+    // lead sees only their own team's leads; an employee sees only leads
+    // they've been individually assigned to. Firestore's security rules
+    // enforce this same scoping server-side, so these queries must match
+    // the rule's where-clause exactly or the read will be denied outright.
+    const leadsQuery = isAdmin
+      ? collection(db, 'leads')
+      : role === 'TEAM_LEAD'
+      ? query(collection(db, 'leads'), where('assignedTeamId', '==', profile?.teamId || '__none__'))
+      : query(collection(db, 'leads'), where('assignedEmployeeIds', 'array-contains', profile?.id || '__none__'));
+
     const unsubLeads = onSnapshot(
-      collection(db, 'leads'),
+      leadsQuery,
       (snap) => {
         const items: Lead[] = [];
         const seen = new Set<string>();
@@ -131,9 +142,17 @@ function MainAppContent() {
       (err) => console.warn('Teams snapshot error', err)
     );
 
-    // Projects subscription
+    // Projects subscription — same role scoping as leads, matched to
+    // assignedTeamId / assignedEmployees so the query stays provably
+    // compatible with the Firestore security rules.
+    const projectsQuery = isAdmin
+      ? collection(db, 'projects')
+      : role === 'TEAM_LEAD'
+      ? query(collection(db, 'projects'), where('assignedTeamId', '==', profile?.teamId || '__none__'))
+      : query(collection(db, 'projects'), where('assignedEmployees', 'array-contains', profile?.id || '__none__'));
+
     const unsubProjects = onSnapshot(
-      collection(db, 'projects'),
+      projectsQuery,
       (snap) => {
         const items: Project[] = [];
         const seen = new Set<string>();
@@ -180,7 +199,7 @@ function MainAppContent() {
       unsubProjects();
       unsubAudits();
     };
-  }, [user, profile]);
+  }, [user, profile, role, isAdmin]);
 
   // Adjust default landing tab based on role or simulated role
   useEffect(() => {
