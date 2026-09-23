@@ -251,7 +251,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
       {/* Recent Leads Quick View */}
       <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5">
-        <div className="flex items-center justify-between mb-4">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-4">
           <div>
             <h3 className="text-sm font-bold text-white">Recent Client Leads</h3>
             <p className="text-[11px] text-slate-400">Newly captured client opportunities and requested services</p>
@@ -259,7 +259,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
           <button
             type="button"
             onClick={() => onNavigate('leads')}
-            className="text-xs text-blue-400 hover:text-blue-300 font-medium"
+            className="text-xs text-blue-400 hover:text-blue-300 font-medium self-start sm:self-auto"
           >
             View All Leads
           </button>

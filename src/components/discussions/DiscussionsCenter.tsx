@@ -217,7 +217,7 @@ export const DiscussionsCenter: React.FC<DiscussionsCenterProps> = ({
   return (
     <div className="h-[calc(100vh-140px)] min-h-[550px] bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden flex flex-col md:flex-row shadow-sm animate-in fade-in duration-300">
       {/* Channels Sidebar */}
-      <div className="w-full md:w-80 bg-slate-950/90 border-r border-slate-800 flex flex-col shrink-0">
+      <div className="w-full md:w-80 max-h-[40vh] md:max-h-none bg-slate-950/90 border-r border-slate-800 flex flex-col shrink-0">
         {/* Sidebar Header */}
         <div className="p-4 border-b border-slate-800 flex items-center justify-between">
           <div className="flex items-center gap-2">
@@ -282,7 +282,7 @@ export const DiscussionsCenter: React.FC<DiscussionsCenterProps> = ({
       </div>
 
       {/* Main Chat Area */}
-      <div className="flex-1 flex flex-col bg-slate-900 overflow-hidden">
+      <div className="flex-1 min-h-0 flex flex-col bg-slate-900 overflow-hidden">
         {/* Channel Header */}
         <div className="p-4 border-b border-slate-800 flex items-center justify-between bg-slate-900/80 backdrop-blur-sm">
           <div>
@@ -351,7 +351,7 @@ export const DiscussionsCenter: React.FC<DiscussionsCenterProps> = ({
                     {msg.senderName?.charAt(0).toUpperCase() || 'U'}
                   </div>
 
-                  <div className={`max-w-md space-y-1 ${isMe ? 'items-end' : 'items-start'}`}>
+                  <div className={`max-w-[80%] sm:max-w-md space-y-1 ${isMe ? 'items-end' : 'items-start'}`}>
                     <div
                       className={`flex items-center gap-2 text-[11px] ${
                         isMe ? 'justify-end' : 'justify-start'
