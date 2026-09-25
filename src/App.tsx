@@ -25,6 +25,7 @@ import {
   collection,
   onSnapshot,
   query,
+  where,
   orderBy,
   limit,
 } from 'firebase/firestore';
@@ -47,6 +48,7 @@ function MainAppContent() {
 
   const [activeTab, setActiveTab] = useState<NavTab>('dashboard');
   const [globalSearch, setGlobalSearch] = useState('');
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   // Collections state
   const [leads, setLeads] = useState<Lead[]>([]);
@@ -65,9 +67,19 @@ function MainAppContent() {
   useEffect(() => {
     if (!user && !profile) return;
 
-    // Leads subscription
+    // Leads subscription — scoped by role. Admins see everything; a team
+    // lead sees only their own team's leads; an employee sees only leads
+    // they've been individually assigned to. Firestore's security rules
+    // enforce this same scoping server-side, so these queries must match
+    // the rule's where-clause exactly or the read will be denied outright.
+    const leadsQuery = isAdmin
+      ? collection(db, 'leads')
+      : role === 'TEAM_LEAD'
+      ? query(collection(db, 'leads'), where('assignedTeamId', '==', profile?.teamId || '__none__'))
+      : query(collection(db, 'leads'), where('assignedEmployeeIds', 'array-contains', profile?.id || '__none__'));
+
     const unsubLeads = onSnapshot(
-      collection(db, 'leads'),
+      leadsQuery,
       (snap) => {
         const items: Lead[] = [];
         const seen = new Set<string>();
@@ -130,9 +142,17 @@ function MainAppContent() {
       (err) => console.warn('Teams snapshot error', err)
     );
 
-    // Projects subscription
+    // Projects subscription — same role scoping as leads, matched to
+    // assignedTeamId / assignedEmployees so the query stays provably
+    // compatible with the Firestore security rules.
+    const projectsQuery = isAdmin
+      ? collection(db, 'projects')
+      : role === 'TEAM_LEAD'
+      ? query(collection(db, 'projects'), where('assignedTeamId', '==', profile?.teamId || '__none__'))
+      : query(collection(db, 'projects'), where('assignedEmployees', 'array-contains', profile?.id || '__none__'));
+
     const unsubProjects = onSnapshot(
-      collection(db, 'projects'),
+      projectsQuery,
       (snap) => {
         const items: Project[] = [];
         const seen = new Set<string>();
@@ -149,28 +169,31 @@ function MainAppContent() {
       (err) => console.warn('Projects snapshot error', err)
     );
 
-    // Audits subscription
-    const auditsQuery = query(
-      collection(db, 'audits'),
-      orderBy('timestamp', 'desc'),
-      limit(100)
-    );
-    const unsubAudits = onSnapshot(
-      auditsQuery,
-      (snap) => {
-        const items: AuditLog[] = [];
-        const seen = new Set<string>();
-        snap.forEach((d) => {
-          const id = d.id;
-          if (!seen.has(id)) {
-            seen.add(id);
-            items.push({ id, ...(d.data() as any) } as AuditLog);
-          }
-        });
-        setAudits(items);
-      },
-      (err) => console.warn('Audits snapshot error', err)
-    );
+    // Audits subscription (admin only per firestore.rules)
+    let unsubAudits = () => {};
+    if (isAdmin) {
+      const auditsQuery = query(
+        collection(db, 'audits'),
+        orderBy('timestamp', 'desc'),
+        limit(100)
+      );
+      unsubAudits = onSnapshot(
+        auditsQuery,
+        (snap) => {
+          const items: AuditLog[] = [];
+          const seen = new Set<string>();
+          snap.forEach((d) => {
+            const id = d.id;
+            if (!seen.has(id)) {
+              seen.add(id);
+              items.push({ id, ...(d.data() as any) } as AuditLog);
+            }
+          });
+          setAudits(items);
+        },
+        (err) => console.warn('Audits snapshot error', err)
+      );
+    }
 
     return () => {
       unsubLeads();
@@ -179,7 +202,7 @@ function MainAppContent() {
       unsubProjects();
       unsubAudits();
     };
-  }, [user, profile]);
+  }, [user, profile, role, isAdmin]);
 
   // Adjust default landing tab based on role or simulated role
   useEffect(() => {
@@ -228,6 +251,7 @@ function MainAppContent() {
           setActiveTab('projects');
           setProjectModalOpen(true);
         }}
+        onToggleSidebar={() => setSidebarOpen((v) => !v)}
       />
 
       {/* Body Layout: Sidebar + Main Stage */}
@@ -236,10 +260,12 @@ function MainAppContent() {
           activeTab={activeTab}
           onTabChange={(tab) => setActiveTab(tab as NavTab)}
           counts={counts}
+          isOpen={sidebarOpen}
+          onClose={() => setSidebarOpen(false)}
         />
 
         {/* Dynamic Workspace Container */}
-        <main className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8">
+        <main className="flex-1 min-w-0 overflow-y-auto overflow-x-hidden p-3 sm:p-6 lg:p-8">
           <div className="max-w-7xl mx-auto space-y-6">
             {activeTab === 'dashboard' && (
               <AdminDashboard

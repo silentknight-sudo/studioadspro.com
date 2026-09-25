@@ -3,13 +3,13 @@ import {
   User as FirebaseUser,
   onAuthStateChanged,
   signInWithPopup,
+  signInWithEmailAndPassword,
   GoogleAuthProvider,
   signOut,
 } from 'firebase/auth';
-import { doc, getDoc, setDoc, updateDoc, collection, query, where, getDocs } from 'firebase/firestore';
+import { doc, getDoc, setDoc, updateDoc, deleteDoc, collection, query, where, getDocs } from 'firebase/firestore';
 import { auth, db, handleFirestoreError, OperationType } from '../lib/firebase';
 import { UserProfile, UserRole } from '../types';
-import { seedInitialDatabaseIfEmpty } from '../lib/seedData';
 
 interface AuthContextType {
   user: FirebaseUser | null;
@@ -21,147 +21,153 @@ interface AuthContextType {
   isEmployee: boolean;
   signInGoogle: () => Promise<void>;
   signInEmail: (loginId: string, pass: string) => Promise<void>;
-  signInPreset: (presetKey: 'admin_primary' | 'admin_secondary' | 'team_lead' | 'employee') => Promise<void>;
-  signUpEmail: (email: string, pass: string, name: string, role: UserRole) => Promise<void>;
   logOut: () => Promise<void>;
   updateProfileData: (updates: Partial<UserProfile>) => Promise<void>;
-  switchRoleSimulation: (role: UserRole | null) => void;
-  simulatedRole: UserRole | null;
-  triggerDataSeed: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+// Bootstrap admins can ONLY gain access via a verified Google sign-in on one of
+// these exact addresses. Every other account must be created by an existing
+// admin in User Management before anyone can log in with it.
 const PRECONFIGURED_ADMINS: Record<string, { name: string; role: UserRole }> = {
   'admin@sap.com': { name: 'SAP Executive Admin', role: 'ADMIN' },
   'admin@sap1.com': { name: 'SAP System Admin', role: 'ADMIN' },
   'playsidgaming@gmail.com': { name: 'Owner Administrator', role: 'ADMIN' },
 };
 
-const PRESET_PROFILES: Record<string, UserProfile> = {
-  admin_primary: {
-    id: 'admin-sap-primary',
-    email: 'admin@sap.com',
-    name: 'SAP Executive Director',
-    role: 'ADMIN',
-    profession: 'WEBSITE',
-    employmentType: 'FULL_TIME',
-    createdBy: 'SYSTEM',
-    createdAt: '2026-01-01T00:00:00.000Z',
-    status: 'ACTIVE',
-  },
-  admin_secondary: {
-    id: 'admin-sap-secondary',
-    email: 'admin@sap1.com',
-    name: 'SAP Operations Admin',
-    role: 'ADMIN',
-    profession: 'MARKETING',
-    employmentType: 'FULL_TIME',
-    createdBy: 'SYSTEM',
-    createdAt: '2026-01-01T00:00:00.000Z',
-    status: 'ACTIVE',
-  },
-  team_lead: {
-    id: 'lead-squad-web',
-    email: 'lead@sap.com',
-    name: 'Sarah Chen (Squad Lead)',
-    role: 'TEAM_LEAD',
-    profession: 'WEBSITE',
-    teamId: 'team-web',
-    employmentType: 'FULL_TIME',
-    createdBy: 'SYSTEM',
-    createdAt: '2026-01-01T00:00:00.000Z',
-    status: 'ACTIVE',
-  },
-  employee: {
-    id: 'emp-dev-alex',
-    email: 'employee@sap.com',
-    name: 'Alex Rivera (Engineer)',
-    role: 'EMPLOYEE',
-    profession: 'MOBILE_APP',
-    teamId: 'team-mobile',
-    reportsTo: 'lead-squad-mobile',
-    employmentType: 'FULL_TIME',
-    createdBy: 'SYSTEM',
-    createdAt: '2026-01-01T00:00:00.000Z',
-    status: 'ACTIVE',
-  },
-};
+function friendlyAuthError(err: unknown): string {
+  const code = (err as { code?: string })?.code || '';
+  switch (code) {
+    case 'auth/operation-not-allowed':
+      return 'Email/Password sign-in is not enabled in this Firebase project. Please use "Sign in with Google" with your administrator account (playsidgaming@gmail.com), or enable the Email/Password provider in the Firebase Console (Authentication > Sign-in method).';
+    case 'auth/popup-closed-by-user':
+    case 'auth/cancelled-popup-request':
+      return 'Sign-in window was closed before completion. Please try again.';
+    case 'auth/popup-blocked':
+      return 'Sign-in popup was blocked by your browser. Please allow popups for this site and try again.';
+    case 'auth/user-not-found':
+    case 'auth/invalid-credential':
+    case 'auth/invalid-email':
+      return 'Account not found. For administrative access, please use "Sign in with Google" (playsidgaming@gmail.com). For other roles, contact your administrator.';
+    case 'auth/wrong-password':
+      return 'Incorrect password. Please verify credentials or contact your administrator.';
+    case 'auth/too-many-requests':
+      return 'Too many attempts. Please wait a moment and try again.';
+    case 'auth/user-disabled':
+      return 'Your account is disabled. Contact your administrator.';
+    default:
+      return err instanceof Error ? err.message : 'Sign-in failed. Please try again.';
+  }
+}
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<FirebaseUser | null>(null);
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
-  const [simulatedRole, setSimulatedRole] = useState<UserRole | null>(null);
-  const [sessionOverride, setSessionOverride] = useState<UserProfile | null>(() => {
-    try {
-      const saved = localStorage.getItem('sap_session_user');
-      return saved ? JSON.parse(saved) : null;
-    } catch {
-      return null;
-    }
-  });
 
-  // Production mode: automatic sample seeding disabled per user instruction
-  useEffect(() => {
-    // Zero sample data auto-population
-  }, []);
-
+  // Every authenticated identity (Google or email/password) is resolved to a
+  // Firestore profile keyed by the real Firebase Auth uid. Nobody gets a
+  // profile — and therefore no access — unless one already exists for them,
+  // except the fixed bootstrap admin addresses on first Google sign-in.
   const syncUserProfile = async (firebaseUser: FirebaseUser) => {
-    try {
-      const userRef = doc(db, 'users', firebaseUser.uid);
-      const userSnap = await getDoc(userRef);
+    const userRef = doc(db, 'users', firebaseUser.uid);
+    const userSnap = await getDoc(userRef);
 
-      const email = firebaseUser.email || '';
-      const isAdminEmail = Object.keys(PRECONFIGURED_ADMINS).includes(email.toLowerCase());
+    const email = (firebaseUser.email || '').toLowerCase();
+    const isAdminEmail = Object.keys(PRECONFIGURED_ADMINS).includes(email);
 
-      if (userSnap.exists()) {
-        const data = userSnap.data() as UserProfile;
-        if (isAdminEmail && data.role !== 'ADMIN') {
-          await updateDoc(userRef, { role: 'ADMIN' });
-          data.role = 'ADMIN';
-        }
-        setProfile({ ...data, id: firebaseUser.uid });
-      } else {
-        const newProfile: UserProfile = {
-          id: firebaseUser.uid,
-          email: email,
-          name: firebaseUser.displayName || PRECONFIGURED_ADMINS[email.toLowerCase()]?.name || email.split('@')[0] || 'Team Member',
-          role: isAdminEmail ? 'ADMIN' : 'EMPLOYEE',
-          profession: 'WEBSITE',
-          employmentType: 'FULL_TIME',
-          createdBy: 'SYSTEM',
-          createdAt: new Date().toISOString(),
-          status: 'ACTIVE',
-          avatar: firebaseUser.photoURL || undefined,
-        };
-        await setDoc(userRef, newProfile);
-        setProfile(newProfile);
-
-        if (isAdminEmail) {
+    if (userSnap.exists()) {
+      const data = userSnap.data() as UserProfile;
+      if (data.status !== 'ACTIVE') {
+        await signOut(auth);
+        throw new Error('Your account is inactive. Contact your administrator.');
+      }
+      if (isAdminEmail) {
+        // Guarantee admin record exists in /admins/{uid} and profile role is ADMIN
+        try {
           await setDoc(doc(db, 'admins', firebaseUser.uid), {
-            email: email,
+            email,
             verifiedAt: new Date().toISOString(),
-          });
+          }, { merge: true });
+        } catch (e) {
+          console.warn('Could not write admin record:', e);
+        }
+
+        if (data.role !== 'ADMIN') {
+          try {
+            await updateDoc(userRef, { role: 'ADMIN' });
+            data.role = 'ADMIN';
+          } catch (e) {
+            console.warn('Could not update role:', e);
+          }
         }
       }
-    } catch (error) {
-      console.error('Error syncing user profile:', error);
-      handleFirestoreError(error, OperationType.GET, `users/${firebaseUser.uid}`);
+      setProfile({ ...data, id: firebaseUser.uid, role: isAdminEmail ? 'ADMIN' : data.role });
+      return;
     }
+
+    if (isAdminEmail) {
+      const newProfile: UserProfile = {
+        id: firebaseUser.uid,
+        email,
+        name: firebaseUser.displayName || PRECONFIGURED_ADMINS[email]?.name || email.split('@')[0] || 'Owner Administrator',
+        role: 'ADMIN',
+        profession: 'WEBSITE',
+        employmentType: 'FULL_TIME',
+        createdBy: 'SYSTEM',
+        createdAt: new Date().toISOString(),
+        status: 'ACTIVE',
+        avatar: firebaseUser.photoURL || undefined,
+      };
+      await setDoc(userRef, newProfile);
+      await setDoc(doc(db, 'admins', firebaseUser.uid), { email, verifiedAt: new Date().toISOString() });
+      setProfile(newProfile);
+      return;
+    }
+
+    // A Firebase Auth account exists (created by an admin) but its Firestore
+    // profile is missing under this uid — look it up by email in case it was
+    // migrated from a legacy record, otherwise refuse access outright.
+    const q = query(collection(db, 'users'), where('email', '==', email));
+    const qSnap = await getDocs(q);
+    if (!qSnap.empty) {
+      const existingDoc = qSnap.docs[0];
+      const existing = existingDoc.data() as UserProfile;
+      if (existing.status !== 'ACTIVE') {
+        await signOut(auth);
+        throw new Error('Your account is inactive. Contact your administrator.');
+      }
+      if (existingDoc.id !== firebaseUser.uid) {
+        await setDoc(userRef, { ...existing, id: firebaseUser.uid });
+        await deleteDoc(existingDoc.ref);
+      }
+      setProfile({ ...existing, id: firebaseUser.uid });
+      return;
+    }
+
+    await signOut(auth);
+    throw new Error('No account found for this email. Ask your administrator to create your login.');
   };
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
-      setUser(currentUser);
-      if (currentUser) {
-        setSessionOverride(null);
-        localStorage.removeItem('sap_session_user');
-        await syncUserProfile(currentUser);
-      } else if (!sessionOverride) {
+      if (!currentUser) {
+        setUser(null);
         setProfile(null);
+        setLoading(false);
+        return;
       }
-      setLoading(false);
+      try {
+        await syncUserProfile(currentUser);
+        setUser(currentUser);
+      } catch (error) {
+        console.error('Profile sync failed, signing out:', error);
+        setUser(null);
+        setProfile(null);
+      } finally {
+        setLoading(false);
+      }
     });
 
     return () => unsubscribe();
@@ -169,37 +175,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const signInGoogle = async () => {
     const provider = new GoogleAuthProvider();
+    provider.setCustomParameters({ prompt: 'select_account' });
     await signInWithPopup(auth, provider);
   };
 
-  const signInPreset = async (
-    presetKey: 'admin_primary' | 'admin_secondary' | 'team_lead' | 'employee'
-  ) => {
-    const preset = PRESET_PROFILES[presetKey];
-    if (!preset) return;
-
-    setProfile(preset);
-    setSessionOverride(preset);
-    localStorage.setItem('sap_session_user', JSON.stringify(preset));
-
-    try {
-      await setDoc(doc(db, 'users', preset.id), preset, { merge: true });
-      if (preset.role === 'ADMIN') {
-        await setDoc(
-          doc(db, 'admins', preset.id),
-          { email: preset.email, verifiedAt: new Date().toISOString() },
-          { merge: true }
-        );
-      }
-    } catch {
-      // Non-blocking
-    }
-  };
-
-  // Simple, universal Login ID & Password sign-in handler
+  // Real Firebase Authentication sign-in. The account must already exist —
+  // created by an admin in User Management (or an auto-provisioned bootstrap
+  // admin). Firebase itself rejects unknown emails / wrong passwords; there
+  // is no client-side fallback that creates or authorizes an account.
   const signInEmail = async (loginIdInput: string, passInput: string) => {
     const loginId = loginIdInput.trim().toLowerCase();
-    const cleanId = loginId.replace(/[^a-zA-Z0-9]/g, '_');
 
     if (!loginId) {
       throw new Error('Please enter your Login ID or Email.');
@@ -207,163 +192,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (!passInput) {
       throw new Error('Please enter your Password.');
     }
-
-    // 1. Direct Presets Check
-    if (loginId === 'admin@sap.com' || loginId === 'admin') {
-      await signInPreset('admin_primary');
-      return;
-    }
-    if (loginId === 'admin@sap1.com' || loginId === 'admin1') {
-      await signInPreset('admin_secondary');
-      return;
-    }
-    if (loginId === 'lead@sap.com' || loginId === 'lead') {
-      await signInPreset('team_lead');
-      return;
-    }
-    if (loginId === 'employee@sap.com' || loginId === 'employee') {
-      await signInPreset('employee');
-      return;
-    }
-    if (loginId === 'playsidgaming@gmail.com') {
-      const ownerProfile: UserProfile = {
-        id: 'owner-sid',
-        email: 'playsidgaming@gmail.com',
-        name: 'Owner Administrator',
-        role: 'ADMIN',
-        profession: 'WEBSITE',
-        employmentType: 'FULL_TIME',
-        createdBy: 'SYSTEM',
-        createdAt: '2026-01-01T00:00:00.000Z',
-        status: 'ACTIVE',
-      };
-      setProfile(ownerProfile);
-      setSessionOverride(ownerProfile);
-      localStorage.setItem('sap_session_user', JSON.stringify(ownerProfile));
-      try {
-        await setDoc(doc(db, 'users', ownerProfile.id), ownerProfile, { merge: true });
-      } catch {}
-      return;
+    if (!loginId.includes('@')) {
+      throw new Error('Please sign in with your registered email address.');
     }
 
-    // 2. Query Firestore by doc id or email
     try {
-      let matchedUser: (UserProfile & { password?: string }) | null = null;
-
-      // Try by cleanId doc
-      const directDocRef = doc(db, 'users', cleanId);
-      const directDocSnap = await getDoc(directDocRef);
-      if (directDocSnap.exists()) {
-        matchedUser = directDocSnap.data() as UserProfile & { password?: string };
-      } else {
-        // Query by email
-        const q = query(collection(db, 'users'), where('email', '==', loginId));
-        const qSnap = await getDocs(q);
-        if (!qSnap.empty) {
-          const d = qSnap.docs[0];
-          matchedUser = { id: d.id, ...d.data() } as UserProfile & { password?: string };
-        }
-      }
-
-      if (matchedUser) {
-        // Verify password if set on account
-        if (matchedUser.password && matchedUser.password !== passInput) {
-          throw new Error('Incorrect password. Please verify credentials or reset password.');
-        }
-
-        const userProfile: UserProfile = {
-          id: matchedUser.id || cleanId,
-          email: matchedUser.email || loginId,
-          name: matchedUser.name || loginId.split('@')[0],
-          role: matchedUser.role || 'EMPLOYEE',
-          profession: matchedUser.profession || 'WEBSITE',
-          teamId: matchedUser.teamId,
-          employmentType: matchedUser.employmentType || 'FULL_TIME',
-          reportsTo: matchedUser.reportsTo,
-          createdBy: matchedUser.createdBy || 'SYSTEM',
-          createdAt: matchedUser.createdAt || new Date().toISOString(),
-          status: matchedUser.status || 'ACTIVE',
-          phone: matchedUser.phone,
-          avatar: matchedUser.avatar,
-        };
-
-        setProfile(userProfile);
-        setSessionOverride(userProfile);
-        localStorage.setItem('sap_session_user', JSON.stringify(userProfile));
-        return;
-      }
-    } catch (err: any) {
-      if (err.message && err.message.includes('Incorrect password')) {
-        throw err;
-      }
-      console.warn('Firestore user lookup warning:', err);
+      await signInWithEmailAndPassword(auth, loginId, passInput);
+    } catch (err) {
+      throw new Error(friendlyAuthError(err));
     }
-
-    // 3. Fallback: If valid email format and password provided, automatically grant immediate access with custom profile
-    if (loginId.includes('@')) {
-      const fallbackUser: UserProfile = {
-        id: cleanId,
-        email: loginId,
-        name: loginId.split('@')[0].replace(/[._]/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()),
-        role: loginId.includes('admin') ? 'ADMIN' : loginId.includes('lead') ? 'TEAM_LEAD' : 'EMPLOYEE',
-        profession: 'WEBSITE',
-        employmentType: 'FULL_TIME',
-        createdBy: 'DIRECT_LOGIN',
-        createdAt: new Date().toISOString(),
-        status: 'ACTIVE',
-      };
-      setProfile(fallbackUser);
-      setSessionOverride(fallbackUser);
-      localStorage.setItem('sap_session_user', JSON.stringify(fallbackUser));
-      try {
-        await setDoc(doc(db, 'users', cleanId), { ...fallbackUser, password: passInput }, { merge: true });
-      } catch {}
-      return;
-    }
-
-    throw new Error('Account not found. Use admin@sap.com, lead@sap.com, or employee@sap.com, or create an account.');
-  };
-
-  const signUpEmail = async (
-    emailInput: string,
-    passInput: string,
-    name: string,
-    targetRole: UserRole
-  ) => {
-    const email = emailInput.trim().toLowerCase();
-    const cleanId = email.replace(/[^a-zA-Z0-9]/g, '_');
-
-    if (!email || !passInput || !name) {
-      throw new Error('Please fill in all required registration fields.');
-    }
-
-    const newProfile: UserProfile = {
-      id: cleanId,
-      email: email,
-      name: name.trim(),
-      role: targetRole,
-      profession: 'WEBSITE',
-      employmentType: 'FULL_TIME',
-      createdBy: 'SELF_REGISTER',
-      createdAt: new Date().toISOString(),
-      status: 'ACTIVE',
-    };
-
-    // Store in Firestore and set session immediately
-    await setDoc(doc(db, 'users', cleanId), { ...newProfile, password: passInput });
-    if (targetRole === 'ADMIN') {
-      await setDoc(doc(db, 'admins', cleanId), { email, verifiedAt: new Date().toISOString() });
-    }
-
-    setProfile(newProfile);
-    setSessionOverride(newProfile);
-    localStorage.setItem('sap_session_user', JSON.stringify(newProfile));
   };
 
   const logOut = async () => {
-    setSessionOverride(null);
-    setSimulatedRole(null);
-    localStorage.removeItem('sap_session_user');
     setProfile(null);
     if (auth.currentUser) {
       await signOut(auth);
@@ -377,44 +217,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       await updateDoc(doc(db, 'users', activeId), updates);
       setProfile((prev) => (prev ? { ...prev, ...updates } : null));
-      if (sessionOverride) {
-        const updated = { ...sessionOverride, ...updates };
-        setSessionOverride(updated);
-        localStorage.setItem('sap_session_user', JSON.stringify(updated));
-      }
     } catch (error) {
       handleFirestoreError(error, OperationType.UPDATE, `users/${activeId}`);
     }
   };
 
-  const switchRoleSimulation = (roleToSimulate: UserRole | null) => {
-    setSimulatedRole(roleToSimulate);
-  };
-
-  const triggerDataSeed = async () => {
-    const { forceSeedDatabase } = await import('../lib/seedData');
-    await forceSeedDatabase();
-  };
-
-  const activeProfile = profile || sessionOverride;
-  const effectiveRole: UserRole = simulatedRole || activeProfile?.role || 'EMPLOYEE';
-
-  const effectiveUser =
-    user ||
-    (activeProfile
-      ? ({
-          uid: activeProfile.id,
-          email: activeProfile.email,
-          displayName: activeProfile.name,
-          photoURL: activeProfile.avatar,
-        } as unknown as FirebaseUser)
-      : null);
+  const emailLower = (user?.email || profile?.email || '').toLowerCase().trim();
+  const isPreconfiguredAdmin = Boolean(emailLower && Object.keys(PRECONFIGURED_ADMINS).includes(emailLower));
+  const effectiveRole: UserRole = isPreconfiguredAdmin ? 'ADMIN' : (profile?.role || 'EMPLOYEE');
 
   return (
     <AuthContext.Provider
       value={{
-        user: effectiveUser,
-        profile: activeProfile,
+        user,
+        profile,
         role: effectiveRole,
         loading,
         isAdmin: effectiveRole === 'ADMIN',
@@ -422,13 +238,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         isEmployee: effectiveRole === 'EMPLOYEE',
         signInGoogle,
         signInEmail,
-        signInPreset,
-        signUpEmail,
         logOut,
         updateProfileData,
-        switchRoleSimulation,
-        simulatedRole,
-        triggerDataSeed,
       }}
     >
       {children}

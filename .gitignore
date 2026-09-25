@@ -6,3 +6,9 @@ coverage/
 *.log
 .env*
 !.env.example
+
+# Firebase service-account keys used by local admin scripts (scripts/*.mjs) —
+# these grant full admin access to the project and must never be committed.
+service-account*.json
+*-service-account.json
+*-firebase-adminsdk-*.json

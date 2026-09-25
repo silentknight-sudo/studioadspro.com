@@ -1,8 +1,134 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    // Fixed bootstrap admin addresses — kept in sync with
+    // PRECONFIGURED_ADMINS in src/context/AuthContext.tsx. Only these
+    // identities may grant themselves the admins/{uid} bootstrap record.
+    function isBootstrapAdminEmail() {
+      return isSignedIn() && (
+        request.auth.token.email in ['admin@sap.com', 'admin@sap1.com', 'playsidgaming@gmail.com'] ||
+        request.auth.token.get('email', '') in ['admin@sap.com', 'admin@sap1.com', 'playsidgaming@gmail.com']
+      );
+    }
+
+    function isAdmin() {
+      return isSignedIn() && (
+        exists(/databases/$(database)/documents/admins/$(request.auth.uid)) ||
+        isBootstrapAdminEmail()
+      );
+    }
+
+    function isSelf(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    // The caller's own Firestore profile — used to scope leads/projects to
+    // a team lead's team or an employee's own assignments.
+    function myProfile() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
+
+    function myTeamId() {
+      return isSignedIn() ? myProfile().get('teamId', '__none__') : '__none__';
+    }
+
+    function myRole() {
+      return isSignedIn() ? myProfile().get('role', '__none__') : '__none__';
+    }
+
+    // Personnel directory. Anyone signed in may read it (needed for team
+    // assignment pickers, mentions, etc). Only an admin may create, delete,
+    // or reassign roles/status; a user may update their own non-privileged
+    // fields (e.g. availability status) but can never change their own role,
+    // status, or who created them.
+    match /users/{userId} {
+      allow read: if isSignedIn();
+      allow create: if isAdmin() || (isSelf(userId) && isBootstrapAdminEmail());
+      allow delete: if isAdmin();
+      allow update: if isAdmin() ||
+        (isSelf(userId) &&
+          request.resource.data.role == resource.data.role &&
+          request.resource.data.status == resource.data.status &&
+          request.resource.data.createdBy == resource.data.createdBy);
+    }
+
+    // Marks which uids are admins. Only an admin can grant admin rights to
+    // someone else; a signed-in user may only write their own bootstrap
+    // record (used once, for the fixed owner/admin email allowlist).
+    match /admins/{userId} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin() || (isSelf(userId) && isBootstrapAdminEmail());
+    }
+
+    // Leads are visible to: admins (everything), the team lead of the team
+    // a lead is assigned to, and any employee individually listed in
+    // assignedEmployeeIds — nobody else. The client's App.tsx queries are
+    // written to match these same conditions with an explicit where()
+    // clause, which is required for Firestore to allow a "list"/onSnapshot
+    // query against a resource.data-dependent rule like this.
+    match /leads/{leadId} {
+      allow read: if isAdmin()
+        || (isSignedIn() && resource.data.get('assignedTeamId', '__none__') == myTeamId())
+        || (isSignedIn() && request.auth.uid in resource.data.get('assignedEmployeeIds', []));
+      allow create: if isAdmin();
+      allow update, delete: if isAdmin()
+        || (isSignedIn() && resource.data.get('assignedTeamId', '__none__') == myTeamId());
+    }
+
+    match /teams/{teamId} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+    }
+
+    // Same scoping as leads, keyed on assignedTeamId / assignedEmployees.
+    match /projects/{projectId} {
+      allow read: if isAdmin()
+        || (isSignedIn() && resource.data.get('assignedTeamId', '__none__') == myTeamId())
+        || (isSignedIn() && request.auth.uid in resource.data.get('assignedEmployees', []));
+      allow create: if isAdmin() || myRole() == 'TEAM_LEAD';
+      allow update, delete: if isAdmin()
+        || (isSignedIn() && resource.data.get('assignedTeamId', '__none__') == myTeamId());
+    }
+
+    // Discussion channels and their messages. Messages are a TOP-LEVEL
+    // collection (not nested under discussions) — the app queries
+    // /messages with a discussionId field, so the rule must match that
+    // same top-level path, not discussions/{id}/messages.
+    match /discussions/{discussionId} {
+      allow read, write: if isSignedIn();
+    }
+
+    match /messages/{messageId} {
+      allow read, write: if isSignedIn();
+    }
+
+    match /invitations/{invitationId} {
+      allow read, write: if isSignedIn();
+    }
+
+    // Audit trail: every signed-in user may append entries (the app logs
+    // actions as the acting user), but only admins may read or manage the
+    // trail, and no one may edit or delete a past entry.
+    match /audits/{auditId} {
+      allow read: if isAdmin();
+      allow create: if isSignedIn();
+      allow update, delete: if false;
+    }
+
+    // Diagnostic ping used by the client on boot.
+    match /test/{docId} {
+      allow read: if true;
+      allow write: if false;
+    }
+
+    // Deny everything else by default.
     match /{document=**} {
-      allow read, write: if true;
+      allow read, write: if false;
     }
   }
 }
