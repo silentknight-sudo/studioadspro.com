@@ -24,8 +24,11 @@ export const LoginView: React.FC = () => {
   const [resetLoading, setResetLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
 
+  const [operationNotAllowed, setOperationNotAllowed] = useState(false);
+
   const handleGoogleSignIn = async () => {
     setGoogleLoading(true);
+    setOperationNotAllowed(false);
     try {
       await signInGoogle();
       success('Welcome back to StudioAdsPro CRM!');
@@ -51,6 +54,14 @@ export const LoginView: React.FC = () => {
       error('Please enter your Login ID or Email.');
       return;
     }
+
+    const normalized = loginId.trim().toLowerCase();
+    if (normalized === 'playsidgaming@gmail.com') {
+      // Owner account signs in via Google
+      await handleGoogleSignIn();
+      return;
+    }
+
     if (!password) {
       error('Please enter your Password.');
       return;
@@ -64,8 +75,9 @@ export const LoginView: React.FC = () => {
       const code = err?.code || '';
       const msg = err?.message || '';
       if (code === 'auth/operation-not-allowed' || msg.includes('operation-not-allowed')) {
+        setOperationNotAllowed(true);
         error(
-          'Email/Password sign-in is not enabled in Firebase. Please click "Sign in with Google" above with your admin account (playsidgaming@gmail.com).'
+          'Email/Password sign-in is not enabled in Firebase. Please click "Sign in with Google" above.'
         );
       } else {
         error(msg || 'Authentication failed. Please verify credentials.');
@@ -139,6 +151,27 @@ export const LoginView: React.FC = () => {
               Select your sign-in method to access the CRM portal.
             </p>
           </div>
+
+          {/* Operation Not Allowed Alert Box */}
+          {operationNotAllowed && (
+            <div className="bg-amber-950/50 border border-amber-500/50 rounded-xl p-3.5 text-xs text-amber-200 space-y-2">
+              <div className="font-semibold text-amber-100 flex items-center gap-1.5">
+                <Info className="w-4 h-4 text-amber-400 shrink-0" />
+                <span>Email/Password is not enabled in Firebase Authentication</span>
+              </div>
+              <p className="text-amber-200/90 text-[11px] leading-relaxed">
+                As the system owner, sign in instantly using the <strong className="text-white">"Sign in with Google"</strong> button above with <strong className="text-white">playsidgaming@gmail.com</strong>.
+              </p>
+              <button
+                type="button"
+                onClick={handleGoogleSignIn}
+                className="w-full mt-1 py-2 px-3 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs rounded-lg transition-colors cursor-pointer flex items-center justify-center gap-2"
+              >
+                <span>Sign in with Google (Owner Admin)</span>
+                <ArrowRight className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          )}
 
           {/* Quick Admin Access Hint */}
           <div className="bg-blue-950/40 border border-blue-800/60 rounded-xl p-3 text-xs text-blue-200 flex items-start gap-2.5">

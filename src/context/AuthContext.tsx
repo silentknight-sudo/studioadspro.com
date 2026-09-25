@@ -126,28 +126,43 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       return;
     }
 
-    // A Firebase Auth account exists (created by an admin) but its Firestore
-    // profile is missing under this uid — look it up by email in case it was
-    // migrated from a legacy record, otherwise refuse access outright.
-    const q = query(collection(db, 'users'), where('email', '==', email));
-    const qSnap = await getDocs(q);
-    if (!qSnap.empty) {
-      const existingDoc = qSnap.docs[0];
-      const existing = existingDoc.data() as UserProfile;
+    // Look up existing profile by primary email OR linked Gmail address so users
+    // can directly sign in using their personal or corporate Google account.
+    let matchedDoc = null;
+    const qEmail = query(collection(db, 'users'), where('email', '==', email));
+    const snapEmail = await getDocs(qEmail);
+    if (!snapEmail.empty) {
+      matchedDoc = snapEmail.docs[0];
+    } else {
+      const qGmail = query(collection(db, 'users'), where('gmail', '==', email));
+      const snapGmail = await getDocs(qGmail);
+      if (!snapGmail.empty) {
+        matchedDoc = snapGmail.docs[0];
+      }
+    }
+
+    if (matchedDoc) {
+      const existing = matchedDoc.data() as UserProfile;
       if (existing.status !== 'ACTIVE') {
         await signOut(auth);
         throw new Error('Your account is inactive. Contact your administrator.');
       }
-      if (existingDoc.id !== firebaseUser.uid) {
-        await setDoc(userRef, { ...existing, id: firebaseUser.uid });
-        await deleteDoc(existingDoc.ref);
+      if (matchedDoc.id !== firebaseUser.uid) {
+        await setDoc(userRef, { ...existing, id: firebaseUser.uid, gmail: existing.gmail || email });
+        if (matchedDoc.id.startsWith('uid_') || matchedDoc.id.startsWith('temp_')) {
+          try {
+            await deleteDoc(matchedDoc.ref);
+          } catch (e) {
+            console.warn('Could not remove temporary doc:', e);
+          }
+        }
       }
-      setProfile({ ...existing, id: firebaseUser.uid });
+      setProfile({ ...existing, id: firebaseUser.uid, gmail: existing.gmail || email });
       return;
     }
 
     await signOut(auth);
-    throw new Error('No account found for this email. Ask your administrator to create your login.');
+    throw new Error('No account found for this Google email. Ask your administrator to link your Gmail in User Management.');
   };
 
   useEffect(() => {

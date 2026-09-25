@@ -14,6 +14,7 @@ export type UserStatus = 'ACTIVE' | 'INACTIVE' | 'ON_LEAVE';
 export interface UserProfile {
   id: string;
   email: string;
+  gmail?: string; // Linked Google/Gmail address for direct Google sign-in
   name: string;
   role: UserRole;
   profession: Profession;

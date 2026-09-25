@@ -6,6 +6,7 @@
       "type": "object",
       "properties": {
         "email": { "type": "string", "maxLength": 100 },
+        "gmail": { "type": "string", "maxLength": 100, "description": "Linked Google/Gmail ID for direct 1-click Google authentication" },
         "name": { "type": "string", "maxLength": 100 },
         "role": { "type": "string", "enum": ["ADMIN", "TEAM_LEAD", "EMPLOYEE"] },
         "profession": { "type": "string", "enum": ["MOBILE_APP", "WEBSITE", "MARKETING", "SOCIAL_MEDIA_HANDLING", "VIDEO_SHOOT_EDIT"] },

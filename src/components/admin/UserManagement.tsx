@@ -32,6 +32,8 @@ import {
   XCircle,
   X,
   Lock,
+  Pencil,
+  Mail,
 } from 'lucide-react';
 
 interface UserManagementProps {
@@ -71,6 +73,7 @@ export const UserManagement: React.FC<UserManagementProps> = ({
   // Form states for creating new user
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
+  const [gmail, setGmail] = useState('');
   const [password, setPassword] = useState('Pass@SAP2026');
   const [role, setRole] = useState<UserRole>('EMPLOYEE');
   const [profession, setProfession] = useState<Profession>('WEBSITE');
@@ -78,15 +81,103 @@ export const UserManagement: React.FC<UserManagementProps> = ({
   const [teamId, setTeamId] = useState<string>('');
   const [phone, setPhone] = useState('');
 
+  // Form states for editing existing user
+  const [editingUser, setEditingUser] = useState<UserProfile | null>(null);
+  const [editName, setEditName] = useState('');
+  const [editEmail, setEditEmail] = useState('');
+  const [editGmail, setEditGmail] = useState('');
+  const [editRole, setEditRole] = useState<UserRole>('EMPLOYEE');
+  const [editProfession, setEditProfession] = useState<Profession>('WEBSITE');
+  const [editEmploymentType, setEditEmploymentType] = useState<EmploymentType>('FULL_TIME');
+  const [editTeamId, setEditTeamId] = useState<string>('');
+  const [editPhone, setEditPhone] = useState('');
+  const [editStatus, setEditStatus] = useState<UserStatus>('ACTIVE');
+  const [editSaving, setEditSaving] = useState(false);
+
   const resetForm = () => {
     setName('');
     setEmail('');
+    setGmail('');
     setPassword('Pass@SAP2026');
     setRole('EMPLOYEE');
     setProfession('WEBSITE');
     setEmploymentType('FULL_TIME');
     setTeamId('');
     setPhone('');
+  };
+
+  const handleStartEdit = (u: UserProfile) => {
+    setEditingUser(u);
+    setEditName(u.name || '');
+    setEditEmail(u.email || '');
+    setEditGmail(u.gmail || '');
+    setEditRole(u.role || 'EMPLOYEE');
+    setEditProfession(u.profession || 'WEBSITE');
+    setEditEmploymentType(u.employmentType || 'FULL_TIME');
+    setEditTeamId(u.teamId || '');
+    setEditPhone(u.phone || '');
+    setEditStatus(u.status || 'ACTIVE');
+  };
+
+  const handleSaveEdit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingUser) return;
+    if (!editName.trim() || !editEmail.trim()) {
+      error('Full Name and Corporate Email are required.');
+      return;
+    }
+
+    const normalizedEmail = editEmail.trim().toLowerCase();
+    const normalizedGmail = editGmail.trim().toLowerCase();
+
+    if (normalizedGmail && !normalizedGmail.includes('@')) {
+      error('Please enter a valid Gmail address (e.g. name@gmail.com).');
+      return;
+    }
+
+    setEditSaving(true);
+    try {
+      const updates: Partial<UserProfile> = {
+        name: editName.trim(),
+        email: normalizedEmail,
+        gmail: normalizedGmail || undefined,
+        role: editRole,
+        profession: editProfession,
+        employmentType: editEmploymentType,
+        teamId: editTeamId || undefined,
+        phone: editPhone.trim() || undefined,
+        status: editStatus,
+      };
+
+      await updateDoc(doc(db, 'users', editingUser.id), updates);
+
+      if (editRole === 'ADMIN') {
+        await setDoc(
+          doc(db, 'admins', editingUser.id),
+          {
+            email: normalizedEmail,
+            gmail: normalizedGmail || undefined,
+            updatedAt: new Date().toISOString(),
+          },
+          { merge: true }
+        );
+      }
+
+      await logAuditEvent(
+        'USER_UPDATED',
+        profile?.email || 'Admin',
+        `Updated user "${editName.trim()}" (${normalizedEmail}). Linked Gmail: ${normalizedGmail || 'None'}`
+      );
+
+      success(`User "${editName.trim()}" updated successfully!`);
+      setEditingUser(null);
+    } catch (err: any) {
+      console.error('Error updating user profile:', err);
+      handleFirestoreError(err, OperationType.UPDATE, `users/${editingUser.id}`);
+      error(err?.message || 'Failed to update user profile.');
+    } finally {
+      setEditSaving(false);
+    }
   };
 
   const handleCreateUser = async (e: React.FormEvent) => {
@@ -97,6 +188,13 @@ export const UserManagement: React.FC<UserManagementProps> = ({
     }
 
     const normalizedEmail = email.trim().toLowerCase();
+    const normalizedGmail = gmail.trim().toLowerCase();
+
+    if (normalizedGmail && !normalizedGmail.includes('@')) {
+      error('Please enter a valid Gmail address (e.g. name@gmail.com).');
+      return;
+    }
+
     if (password.trim().length < 6) {
       error('Password must be at least 6 characters (Firebase requirement).');
       return;
@@ -124,6 +222,7 @@ export const UserManagement: React.FC<UserManagementProps> = ({
       const newUser: UserProfile = {
         id: uid,
         email: normalizedEmail,
+        gmail: normalizedGmail || undefined,
         name: name.trim(),
         role,
         profession,
@@ -139,6 +238,7 @@ export const UserManagement: React.FC<UserManagementProps> = ({
       if (role === 'ADMIN') {
         await setDoc(doc(db, 'admins', uid), {
           email: normalizedEmail,
+          gmail: normalizedGmail || undefined,
           createdAt: new Date().toISOString(),
         });
       }
@@ -146,14 +246,14 @@ export const UserManagement: React.FC<UserManagementProps> = ({
       await logAuditEvent(
         'USER_CREATED',
         profile?.email || 'Admin',
-        `Created user "${name}" (${normalizedEmail}) with role ${role} and profession ${profession}`
+        `Created user "${name}" (${normalizedEmail}) with role ${role} and profession ${profession}. Linked Gmail: ${normalizedGmail || 'None'}`
       );
 
       if (isSecondaryAuthCreated) {
-        success(`User ${name} created successfully with temporary password: ${password}`);
+        success(`User ${name} created successfully! Temporary password: ${password}`);
       } else {
         success(
-          `User ${name} added! (They can sign in with Google via ${normalizedEmail}, or enable Email/Password in Firebase Console)`
+          `User ${name} added! They can sign in directly with Google using ${normalizedGmail || normalizedEmail}.`
         );
       }
       setModalOpen(false);
@@ -394,8 +494,29 @@ export const UserManagement: React.FC<UserManagementProps> = ({
                             {u.name.charAt(0).toUpperCase()}
                           </div>
                           <div>
-                            <div className="font-semibold text-white">{u.name}</div>
-                            <div className="text-[10px] text-slate-400">{u.email}</div>
+                            <div className="font-semibold text-white flex items-center gap-1.5 flex-wrap">
+                              <span>{u.name}</span>
+                              {u.gmail && (
+                                <span
+                                  className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"
+                                  title={`Direct Google login enabled: ${u.gmail}`}
+                                >
+                                  <svg className="w-2.5 h-2.5 shrink-0" viewBox="0 0 24 24">
+                                    <path fill="#4285F4" d="M23.52 12.27c0-.85-.08-1.67-.22-2.45H12v4.64h6.47c-.28 1.5-1.13 2.77-2.4 3.62v3h3.88c2.27-2.09 3.57-5.17 3.57-8.81z" />
+                                    <path fill="#34A853" d="M12 24c3.24 0 5.95-1.07 7.94-2.92l-3.88-3c-1.07.72-2.45 1.15-4.06 1.15-3.12 0-5.77-2.11-6.71-4.94H1.28v3.1C3.26 21.3 7.3 24 12 24z" />
+                                    <path fill="#FBBC05" d="M5.29 14.29a7.2 7.2 0 0 1 0-4.58v-3.1H1.28a12 12 0 0 0 0 10.78z" />
+                                    <path fill="#EA4335" d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.44-3.44C17.94 1.19 15.24 0 12 0 7.3 0 3.26 2.7 1.28 6.61l4.01 3.1C6.23 6.86 8.88 4.75 12 4.75z" />
+                                  </svg>
+                                  Google Login
+                                </span>
+                              )}
+                            </div>
+                            <div className="text-[10px] text-slate-400 flex items-center gap-1.5 flex-wrap">
+                              <span>{u.email}</span>
+                              {u.gmail && (
+                                <span className="text-emerald-400/90 font-mono text-[9px]">({u.gmail})</span>
+                              )}
+                            </div>
                           </div>
                         </div>
                       </td>
@@ -466,6 +587,14 @@ export const UserManagement: React.FC<UserManagementProps> = ({
                         <div className="flex items-center justify-end gap-1.5">
                           {isAdmin && (
                             <>
+                              <button
+                                type="button"
+                                onClick={() => handleStartEdit(u)}
+                                className="p-1.5 rounded-lg text-blue-400 hover:text-blue-300 hover:bg-blue-500/10 transition-colors cursor-pointer"
+                                title="Edit User & Link Gmail"
+                              >
+                                <Pencil className="w-3.5 h-3.5" />
+                              </button>
                               <button
                                 type="button"
                                 onClick={() => handleToggleStatus(u)}
@@ -552,6 +681,20 @@ export const UserManagement: React.FC<UserManagementProps> = ({
                     onChange={(e) => setEmail(e.target.value)}
                     placeholder="m.vance@sap.com"
                     className="w-full bg-slate-950 border border-slate-700 text-white rounded-xl px-3 py-2 text-xs focus:ring-1 focus:ring-blue-500 focus:outline-none"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-emerald-300 mb-1 flex items-center justify-between">
+                    <span>Gmail ID (Google Login)</span>
+                    <span className="text-[10px] text-emerald-400 font-normal">Optional</span>
+                  </label>
+                  <input
+                    type="email"
+                    value={gmail}
+                    onChange={(e) => setGmail(e.target.value)}
+                    placeholder="m.vance@gmail.com"
+                    className="w-full bg-slate-950 border border-emerald-500/40 text-white rounded-xl px-3 py-2 text-xs focus:ring-1 focus:ring-emerald-500 focus:outline-none placeholder-slate-500"
                   />
                 </div>
 
@@ -650,6 +793,189 @@ export const UserManagement: React.FC<UserManagementProps> = ({
                   className="px-5 py-2 rounded-xl text-xs font-semibold text-white bg-blue-600 hover:bg-blue-500 shadow-lg shadow-blue-600/20 cursor-pointer"
                 >
                   Save User Profile
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Edit User Modal with Direct Gmail ID Support */}
+      {editingUser && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-xl shadow-2xl p-6 space-y-4 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2 rounded-xl bg-blue-600/10 text-blue-400 border border-blue-500/20">
+                  <Pencil className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-white">Edit Personnel Profile</h3>
+                  <p className="text-[11px] text-slate-400">
+                    Update profile details and link Gmail ID for direct Google login
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setEditingUser(null)}
+                className="text-slate-400 hover:text-white cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveEdit} className="space-y-4">
+              {/* Linked Gmail ID Feature Card */}
+              <div className="bg-emerald-950/40 border border-emerald-500/40 rounded-xl p-3.5 space-y-2">
+                <div className="flex items-center gap-2">
+                  <svg className="w-4 h-4 shrink-0" viewBox="0 0 24 24">
+                    <path fill="#4285F4" d="M23.52 12.27c0-.85-.08-1.67-.22-2.45H12v4.64h6.47c-.28 1.5-1.13 2.77-2.4 3.62v3h3.88c2.27-2.09 3.57-5.17 3.57-8.81z" />
+                    <path fill="#34A853" d="M12 24c3.24 0 5.95-1.07 7.94-2.92l-3.88-3c-1.07.72-2.45 1.15-4.06 1.15-3.12 0-5.77-2.11-6.71-4.94H1.28v3.1C3.26 21.3 7.3 24 12 24z" />
+                    <path fill="#FBBC05" d="M5.29 14.29a7.2 7.2 0 0 1 0-4.58v-3.1H1.28a12 12 0 0 0 0 10.78z" />
+                    <path fill="#EA4335" d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.44-3.44C17.94 1.19 15.24 0 12 0 7.3 0 3.26 2.7 1.28 6.61l4.01 3.1C6.23 6.86 8.88 4.75 12 4.75z" />
+                  </svg>
+                  <span className="text-xs font-semibold text-emerald-300">Direct Google Login (Gmail ID)</span>
+                </div>
+                <p className="text-[11px] text-emerald-200/90 leading-relaxed">
+                  Enter the user's personal or work Gmail address below. This allows the user to click{' '}
+                  <strong className="text-white">"Sign in with Google"</strong> on the login page using their Gmail account to sign in directly without a password.
+                </p>
+                <div>
+                  <label className="block text-[11px] font-medium text-emerald-200 mb-1">
+                    Google / Gmail Account ID
+                  </label>
+                  <div className="relative">
+                    <Mail className="w-3.5 h-3.5 text-emerald-400 absolute left-3 top-2.5" />
+                    <input
+                      type="email"
+                      value={editGmail}
+                      onChange={(e) => setEditGmail(e.target.value)}
+                      placeholder="e.g. employee.name@gmail.com"
+                      className="w-full bg-slate-950 border border-emerald-500/50 text-white rounded-xl pl-8 pr-3 py-2 text-xs focus:ring-1 focus:ring-emerald-500 focus:outline-none placeholder-slate-500"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-300 mb-1">Full Name *</label>
+                  <input
+                    type="text"
+                    required
+                    value={editName}
+                    onChange={(e) => setEditName(e.target.value)}
+                    className="w-full bg-slate-950 border border-slate-700 text-white rounded-xl px-3 py-2 text-xs focus:ring-1 focus:ring-blue-500 focus:outline-none"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-slate-300 mb-1">Corporate Email / Login ID *</label>
+                  <input
+                    type="email"
+                    required
+                    value={editEmail}
+                    onChange={(e) => setEditEmail(e.target.value)}
+                    className="w-full bg-slate-950 border border-slate-700 text-white rounded-xl px-3 py-2 text-xs focus:ring-1 focus:ring-blue-500 focus:outline-none"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-slate-300 mb-1">System Role *</label>
+                  <select
+                    value={editRole}
+                    onChange={(e) => setEditRole(e.target.value as UserRole)}
+                    className="w-full bg-slate-950 border border-slate-700 text-white rounded-xl px-3 py-2 text-xs focus:ring-1 focus:ring-blue-500 focus:outline-none"
+                  >
+                    <option value="EMPLOYEE">EMPLOYEE</option>
+                    <option value="TEAM_LEAD">TEAM LEAD</option>
+                    <option value="ADMIN">ADMIN</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-slate-300 mb-1">Profession Line *</label>
+                  <select
+                    value={editProfession}
+                    onChange={(e) => setEditProfession(e.target.value as Profession)}
+                    className="w-full bg-slate-950 border border-slate-700 text-white rounded-xl px-3 py-2 text-xs focus:ring-1 focus:ring-blue-500 focus:outline-none"
+                  >
+                    <option value="MOBILE_APP">Mobile App Development</option>
+                    <option value="WEBSITE">Website & Web App</option>
+                    <option value="MARKETING">Digital Marketing & Ads</option>
+                    <option value="SOCIAL_MEDIA_HANDLING">Social Media</option>
+                    <option value="VIDEO_SHOOT_EDIT">Video Production</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-slate-300 mb-1">Employment Type *</label>
+                  <select
+                    value={editEmploymentType}
+                    onChange={(e) => setEditEmploymentType(e.target.value as EmploymentType)}
+                    className="w-full bg-slate-950 border border-slate-700 text-white rounded-xl px-3 py-2 text-xs focus:ring-1 focus:ring-blue-500 focus:outline-none"
+                  >
+                    <option value="FULL_TIME">Full-time</option>
+                    <option value="FREELANCER">Freelancer</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-slate-300 mb-1">Team Alignment</label>
+                  <select
+                    value={editTeamId}
+                    onChange={(e) => setEditTeamId(e.target.value)}
+                    className="w-full bg-slate-950 border border-slate-700 text-white rounded-xl px-3 py-2 text-xs focus:ring-1 focus:ring-blue-500 focus:outline-none"
+                  >
+                    <option value="">None (Unassigned)</option>
+                    {teams.map((t) => (
+                      <option key={t.id} value={t.id}>
+                        {t.teamName}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-slate-300 mb-1">Contact Phone</label>
+                  <input
+                    type="text"
+                    value={editPhone}
+                    onChange={(e) => setEditPhone(e.target.value)}
+                    placeholder="+91 9876543210"
+                    className="w-full bg-slate-950 border border-slate-700 text-white rounded-xl px-3 py-2 text-xs focus:ring-1 focus:ring-blue-500 focus:outline-none"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-slate-300 mb-1">Account Status</label>
+                  <select
+                    value={editStatus}
+                    onChange={(e) => setEditStatus(e.target.value as UserStatus)}
+                    className="w-full bg-slate-950 border border-slate-700 text-white rounded-xl px-3 py-2 text-xs focus:ring-1 focus:ring-blue-500 focus:outline-none"
+                  >
+                    <option value="ACTIVE">ACTIVE</option>
+                    <option value="INACTIVE">INACTIVE</option>
+                    <option value="ON_LEAVE">ON LEAVE</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-800">
+                <button
+                  type="button"
+                  onClick={() => setEditingUser(null)}
+                  className="px-4 py-2 rounded-xl text-xs font-semibold text-slate-400 hover:text-white cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={editSaving}
+                  className="px-5 py-2 rounded-xl text-xs font-semibold text-white bg-blue-600 hover:bg-blue-500 shadow-lg shadow-blue-600/20 cursor-pointer disabled:opacity-50"
+                >
+                  {editSaving ? 'Saving Changes...' : 'Save User Profile'}
                 </button>
               </div>
             </form>
